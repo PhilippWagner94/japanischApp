@@ -62,7 +62,7 @@ function itemQ(id, mode, pool) {
     if (mode === 'mc') return choiceQ({ id, mode, err: 'vocab', title: 'Was heißt das?', prompt: `<div class="big-jp">${wordHtml(it)}</div>`, audio: it.kana, options: [it, ...ds].map(x => ({ h: esc(x.de), ok: x === it, id: x.id })) });
     if (mode === 'mcr') return choiceQ({ id, mode: 'mc', err: 'vocab', title: 'Wie sagt man das?', prompt: `<div class="big-de">${esc(it.de)}</div>`, options: [it, ...ds].map(x => ({ h: jp(x), ok: x === it, id: x.id })), explain: `${romaOf(it.kana)}` });
     if (mode === 'hear') return choiceQ({ id, mode, err: 'hear', title: 'Hören und wählen', prompt: 'Welches Wort hörst du?', audio: it.kana, slow: true, options: [it, ...ds].map(x => ({ h: jp(x) + `<small class="sub">${esc(x.de)}</small>`, ok: x === it, id: x.id })) });
-    if (mode === 'type') return typeQ({ id, mode, err: 'vocab', title: 'Auf Japanisch schreiben', prompt: `<div class="big-de">${esc(it.de)}</div><div class="muted center">Tippe das Wort auf Japanisch.</div>`, answers: ans, show: it.kana + (it.kanji ? ` (${it.kanji})` : '') });
+    if (mode === 'type') return typeQ({ jp: true, id, mode, err: 'vocab', title: 'Auf Japanisch schreiben', prompt: `<div class="big-de">${esc(it.de)}</div><div class="muted center">Tippe das Wort auf Japanisch.</div>`, answers: ans, show: it.kana + (it.kanji ? ` (${it.kanji})` : '') });
     return speakQ({ id, html: wordHtml(it, true), say: it.kana, de: it.de });
   }
   /* Kanji */
@@ -156,7 +156,7 @@ function contentSlots(l) {
   add('Japanisch → Deutsch', '🇩🇪', () => T(4).map(id => itemQ(id, 'mc')));
   add('Deutsch → Japanisch', '🇯🇵', () => T(4).map(id => itemQ(id, 'mcr')));
   add('Hören und wählen', '👂', () => T(4).map(id => itemQ(id, 'hear')));
-  add('Hören und tippen', '⌨️', () => T(3).map(id => { const it = Items[id]; return typeQ({ id, mode: 'type', err: 'hear', title: 'Diktat', prompt: 'Höre zu und tippe, was du hörst.', audio: it.kana, answers: [it.kana, ...(it.kanji ? [it.kanji] : [])], show: it.kana + (it.kanji ? ` (${it.kanji})` : ''), explain: esc(it.de) }); }));
+  add('Hören und tippen', '⌨️', () => T(3).map(id => { const it = Items[id]; return typeQ({ jp: true, slow: true, id, mode: 'type', err: 'hear', title: 'Diktat', prompt: 'Höre zu und wähle die Zeichen, die du hörst.', audio: it.kana, answers: [it.kana, ...(it.kanji ? [it.kanji] : [])], show: it.kana + (it.kanji ? ` (${it.kanji})` : ''), explain: esc(it.de) }); }));
   add('Lesen üben', '📖', () => T(4).map(id => {
     const it = Items[id]; const ds = wordDists(it);
     const withRo = S.settings.romajiHelp;
@@ -197,7 +197,7 @@ function contentSlots(l) {
     return [infoQ({ title: g.title, html: `<div class="card"><h3>${esc(g.title)}</h3>${g.body.map(b => `<p>${esc(b)}</p>`).join('')}<div class="examples">${g.ex.map(e => `<div class="ex"><span class="jp">${P.html(e[0], S.settings.furigana)}</span>${playBtn(P.reading(e[0]))}<div class="muted">${esc(e[1])}</div></div>`).join('')}</div></div>` }),
       choiceQ({ err: 'general', title: 'Kurz überprüft', prompt: esc(g.check.q), options: g.check.o.map((x, i) => ({ h: /[ぁ-ん一-龥]/.test(x) && x.length < 12 ? `<span class="jp">${esc(x)}</span>` : esc(x), ok: i === g.check.a })) })];
   });
-  add('Übersetzen', '✍️', () => taker(sents)(2).map(s => typeQ({ err: 'translate', title: 'Übersetzen', prompt: `<div class="big-de">${esc(s.de)}</div><div class="muted center">Schreibe den Satz auf Japanisch (Romaji oder Kana). Partikel wie は kannst du „wa“ oder „ha“ schreiben.</div>`, answers: sentVariants(s), show: P.reading(s.s), placeholder: 'Satz tippen', explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })));
+  add('Übersetzen', '✍️', () => taker(sents)(2).map(s => typeQ({ jp: true, err: 'translate', title: 'Übersetzen', prompt: `<div class="big-de">${esc(s.de)}</div><div class="muted center">Schreibe den Satz auf Japanisch in Kana. Das Partikel は kannst du als は oder わ schreiben.</div>`, answers: sentVariants(s), show: P.reading(s.s), placeholder: 'Satz tippen', explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })));
   add('Nachsprechen', '🎤', () => {
     const w = T(2).map(id => itemQ(id, 'speak'));
     const s = taker(sents)(1).map(s => speakQ({ title: 'Satz nachsprechen', html: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>`, say: sentReading(s), alt: [P.surface(s.s)], de: s.de, strict: 0.75 }));
@@ -254,8 +254,8 @@ function kanaSlots(l) {
   add('Eintippen', '✏️', () => T(4).map(id => itemQ(id, 'type', kPool)));
   add('Wort bauen', '🧱', () => { const ws = K.words.filter(w => splitKana(w.k).length >= 3 && splitKana(w.k).length <= 5); if (ws.length < 2) return T(3).map(id => itemQ(id, 'hear', kPool)); return taker(ws)(3).map(w => orderQ({ prompt: `Baue das Wort aus den Zeichen: <b>${esc(w.de)}</b>`, tokens: splitKana(w.k), answer: w.k })); });
   add('Merkhilfen', '💡', () => [infoQ({ title: 'Merkhilfen', html: `<div class="card"><h3>Worauf du achten solltest</h3>${l.tips.map(t => `<p>${esc(t)}</p>`).join('')}</div>` }), ...T(1).map(id => itemQ(id, 'read', kPool))]);
-  add('Lesung → Eintippen', '⌨️', () => T(4).map(id => { const it = Items[id]; return typeQ({ id, mode: 'type', err: 'kana', title: 'Zeichen schreiben', prompt: `Tippe das Zeichen für <b>${esc(it.ro)}</b>`, audio: it.ch, autoplay: false, placeholder: 'Romaji eintippen', answers: [it.ch], show: it.ch, explain: `${esc(it.ch)} = ${esc(it.ro)}` }); }));
-  add('Nachsprechen', '🎤', () => { const ws = K.words.length ? wordsT(2) : []; const cs = T(2).map(id => { const it = Items[id]; return speakQ({ id, html: `<span class="jp big">${esc(it.ch)}</span>`, say: it.ch, de: it.ro }); }); return [...cs, ...ws.map(w => speakQ({ title: 'Wort nachsprechen', html: `<span class="jp big">${esc(w.k)}</span>`, say: w.k, de: w.de }))]; });
+  add('Lesung → Zeichen wählen', '⌨️', () => T(4).map(id => { const it = Items[id]; return typeQ({ jp: true, id, mode: 'type', err: 'kana', title: 'Zeichen schreiben', prompt: `Wähle das Zeichen für <b>${esc(it.ro)}</b>`, audio: it.ch, autoplay: false, answers: [it.ch], show: it.ch, explain: `${esc(it.ch)} = ${esc(it.ro)}` }); }));
+  add('Nachsprechen', '🎤', () => { const ws = K.words.length ? wordsT(4) : []; const cs = (ws.length ? [] : T(2)).map(id => { const it = Items[id]; return speakQ({ id, html: `<span class="jp big">${esc(it.ch)}</span>`, say: it.ch, de: it.ro }); }); return [...cs, ...ws.map(w => speakQ({ title: 'Wort nachsprechen', html: `<span class="jp big">${esc(w.k)}</span>`, say: w.k, de: w.de }))]; });
   add('Ähnliche Laute', '🎧', () => {
     const okP = PAIRS.filter(p => [...(p[0] + p[2])].every(c => K.learned.has(c)));
     if (okP.length >= 2) return taker(okP)(3).map(p => { const first = Math.random() < 0.5; const w = first ? p[0] : p[2]; return choiceQ({ err: 'hear', title: 'Welches Wort hörst du?', prompt: 'Ähnliche Laute: Welches Wort hörst du?', audio: w, slow: true, options: [{ h: `<span class="jp">${esc(p[0])}</span><small class="sub">${esc(p[1])}</small>`, ok: first }, { h: `<span class="jp">${esc(p[2])}</span><small class="sub">${esc(p[3])}</small>`, ok: !first }], explain: `${esc(p[0])} (${esc(p[1])}) ≠ ${esc(p[2])} (${esc(p[3])})` }); });

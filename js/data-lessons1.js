@@ -32,7 +32,9 @@ LESSONS.push(
       ['ごめんなさい', '', 'Es tut mir leid', '😔'],
       ['はい', '', 'ja', '✅'],
       ['いいえ', '', 'nein', '❌'],
-      ['さようなら', '', 'Auf Wiedersehen', '🖐️'],
+      ['またね', '', 'Bis dann / Tschüss (locker)', '👋'],
+      ['しつれいします', '', 'Verzeihung beim Gehen oder Eintreten (formell)', '🚪'],
+      ['さようなら', '', 'Auf Wiedersehen (förmlich, im Alltag selten)', '🖐️'],
       ['おやすみなさい', '', 'Gute Nacht', '😴'],
     ],
     sents: [
@@ -47,6 +49,7 @@ LESSONS.push(
         'Lange Vokale zählen doppelt: おばさん (Tante) ≠ おばあさん (Großmutter). Das kleine っ ist eine kurze Pause: きて (komm) ≠ きって (Briefmarke).',
         'Das は in こんにちは und こんばんは spricht man „wa“, weil es ursprünglich die Partikel は war.',
         'ございます macht einen Gruß höflicher. Unter Freunden reicht おはよう oder ありがとう.',
+        'さようなら klingt nach einem endgültigen Abschied und wird im Alltag selten benutzt. Üblich sind locker またね („bis dann“) oder じゃあね, und höflich しつれいします beim Verlassen eines Raums oder Büros.',
       ],
       ex: [['おはよう|ございます', 'Guten Morgen (höflich)'], ['こんにちは', 'Guten Tag']],
       check: { q: 'Wie spricht man das は in こんにちは aus?', o: ['wa', 'ha', 'ba', 'pa'], a: 0 },
@@ -57,7 +60,7 @@ LESSONS.push(
       q: [{ q: 'Welche Begrüßung sagt Tanaka zuerst?', o: ['Guten Morgen', 'Guten Abend', 'Gute Nacht', 'Auf Wiedersehen'], a: 0 }],
     },
     listen: {
-      text: 'こんばんは。ありがとう|ございます。さようなら。', de: 'Guten Abend. Vielen Dank. Auf Wiedersehen.',
+      text: 'こんばんは。ありがとう|ございます。またね。', de: 'Guten Abend. Vielen Dank. Bis dann.',
       q: [{ q: 'Welche Begrüßung hörst du als erste?', o: ['Guten Morgen', 'Guten Tag', 'Guten Abend', 'Gute Nacht'], a: 2 }],
     },
     dialog: {
@@ -65,7 +68,7 @@ LESSONS.push(
       turns: [
         { a: 'おはよう|ございます。', hint: 'Es ist morgens. Erwidere den Gruß.', o: ['おはよう|ございます。', 'こんばんは。', 'おやすみなさい。'] },
         { a: 'ありがとう|ございます。', hint: 'Jemand bedankt sich bei dir.', o: ['どういたしまして。', 'ごめんなさい。', 'こんばんは。'] },
-        { a: 'さようなら。', hint: 'Verabschiede dich ebenfalls.', o: ['さようなら。', 'こんにちは。', 'はい。'] },
+        { a: 'じゃあ、また。', hint: 'Verabschiede dich locker unter Bekannten (bis dann).', o: ['またね。', 'はじめまして。', 'おはよう|ございます。'] },
       ],
     },
   },

@@ -36,34 +36,63 @@ function choiceQ(o) {
   };
 }
 
-/* Tipp-Frage: Antworten als Liste möglicher Lösungen (Kana oder Kanji) */
+/* Kana-Auswahl (Pad): alle Hiragana/Katakana zum Antippen */
+function padRows(script) {
+  const groups = ALL_GROUPS.filter(g => g.script === script && !/-c\d$|-x$/.test(g.id));
+  const col = { a: 0, i: 1, u: 2, e: 3, o: 4, n: 2 };
+  const rows = groups.map(g => { const r = ['', '', '', '', '']; g.chars.forEach(c => { r[col[c.ro.slice(-1)] || 0] = c.ch; }); return r; });
+  rows.push(script === 'h' ? ['ゃ', 'ゅ', 'ょ', 'っ', 'ー'] : ['ャ', 'ュ', 'ョ', 'ッ', 'ー']);
+  return rows;
+}
+const padHtml = sc => `<div class="seg small"><button data-sc="h" class="${sc === 'h' ? 'on' : ''}">ひらがな</button><button data-sc="k" class="${sc === 'k' ? 'on' : ''}">カタカナ</button><button class="del" aria-label="Löschen">⌫</button></div>
+  <div class="pad">${padRows(sc).map(r => r.map(c => c ? `<button class="pk jp" data-c="${c}">${c}</button>` : '<span></span>').join('')).join('')}</div>`;
+
+/* Tipp-Frage: Antworten als Liste möglicher Lösungen (Kana oder Kanji). o.jp = japanische Ausgabe (Kana-Pad) */
 function typeQ(o) {
-  return {
+  const q = {
     title: o.title, id: o.id, mode: o.mode,
-    render(host, api) {
+    render(host, api, keep) {
+      const pad = !!o.jp && S.settings.padInput !== false;
+      const startSc = /[\u30a0-\u30ff]/.test(String(o.answers[0] || '')) && !/[\u3040-\u309f]/.test(String(o.answers[0] || '')) ? 'k' : 'h';
       host.innerHTML = `
         <div class="prompt">${o.prompt || ''}</div>
-        ${o.audio ? `<div class="center">${playBtn(o.audio, 'lg')}</div>` : ''}
-        <input class="inp" type="text" lang="ja" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${esc(o.placeholder || 'Romaji oder Kana tippen')}">
+        ${o.audio ? `<div class="center">${playBtn(o.audio, 'lg')} ${o.slow ? slowBtn(o.audio) : ''}</div>` : ''}
+        <input class="inp" type="text" lang="ja" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" ${pad ? 'readonly inputmode="none"' : ''} placeholder="${esc(pad ? 'Zeichen unten antippen' : (o.placeholder || 'Romaji oder Kana tippen'))}">
         <div class="preview" aria-live="polite">&nbsp;</div>
-        <div class="row"><button class="btn ghost skip">Weiß nicht</button><button class="btn primary check">Prüfen</button></div>`;
+        ${pad ? '<div class="padwrap"></div>' : ''}
+        <div class="row"><button class="btn ghost skip">Weiß nicht</button><button class="btn primary check">Prüfen</button></div>
+        ${o.jp ? `<div class="center"><button class="linkbtn swap">${pad ? 'Stattdessen Tastatur benutzen' : 'Stattdessen Kana-Auswahl benutzen'}</button></div>` : ''}`;
       bindSay(host);
-      if (o.audio && o.autoplay !== false) setTimeout(() => Voice.speak(o.audio), 250);
+      if (o.audio && o.autoplay !== false && !keep) setTimeout(() => Voice.speak(o.audio), 250);
       const inp = $('.inp', host), prev = $('.preview', host);
-      inp.oninput = () => { const k = romajiToKana(inp.value); prev.textContent = inp.value && /[a-z]/i.test(inp.value) ? k : ' '; };
+      if (keep) inp.value = keep;
+      if (pad) {
+        let sc = startSc;
+        const draw = () => {
+          $('.padwrap', host).innerHTML = padHtml(sc);
+          $$('[data-sc]', host).forEach(b => b.onclick = () => { sc = b.dataset.sc; draw(); });
+          $$('.pk', host).forEach(b => b.onclick = () => { inp.value += b.dataset.c; });
+          $('.del', host).onclick = () => { inp.value = [...inp.value].slice(0, -1).join(''); };
+        };
+        draw();
+      } else {
+        inp.oninput = () => { const k = romajiToKana(inp.value); prev.textContent = inp.value && /[a-z]/i.test(inp.value) ? k : '\u00a0'; };
+        setTimeout(() => { try { inp.focus(); } catch (e) { /* ignorieren */ } }, 100);
+      }
+      const sw = $('.swap', host); if (sw) sw.onclick = () => { S.settings.padInput = !pad; Store.save(); q.render(host, api, inp.value); };
       const fin = giveUp => {
         if (host.dataset.done) return; host.dataset.done = 1;
         const val = inp.value.trim();
         const ok = !giveUp && val && o.answers.some(a => norm(val) === norm(a) || val === a || (o.accept && o.accept(val)));
-        inp.disabled = true;
+        inp.disabled = true; const pw = $('.padwrap', host); if (pw) pw.style.display = 'none'; if (sw) sw.style.display = 'none';
         api.result(!!ok, { id: o.id, mode: o.mode, err: o.err, msg: ok ? (o.explain || '') : `Richtig: <b class="jp">${esc(o.show || o.answers[0])}</b>${o.explain ? '<br>' + o.explain : ''}` });
       };
       $('.check', host).onclick = () => fin(false);
       $('.skip', host).onclick = () => fin(true);
       inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); fin(false); } };
-      setTimeout(() => { try { inp.focus(); } catch (e) { /* ignorieren */ } }, 100);
     },
   };
+  return q;
 }
 
 /* Wörter zu einem Satz ordnen */
@@ -119,7 +148,7 @@ function matchQ(o) {
   };
 }
 
-/* Nachsprechen */
+/* Nachsprechen (tolerant: kurze Ziele großzügig, nach „nicht erkannt“ Selbstkorrektur möglich) */
 function speakQ(o) {
   return {
     title: o.title || 'Nachsprechen', id: o.id, mode: 'speak',
@@ -129,30 +158,34 @@ function speakQ(o) {
         <div class="prompt">Sprich nach:</div>
         <div class="big-jp">${o.html}</div>
         <div class="muted center">${esc(o.de || '')}</div>
-        <div class="center">${playBtn(o.say, 'lg')} <span class="muted">Zuerst anhören</span></div>
+        <div class="center">${playBtn(o.say, 'lg')} ${slowBtn(o.say)} <span class="muted">Zuerst anhören</span></div>
         <div class="center"><button class="btn mic" ${canMic ? '' : 'disabled'}>🎤 Sprechen</button></div>
         <div class="heard muted center" aria-live="polite">${canMic ? '' : 'Spracherkennung ist in diesem Browser nicht verfügbar. Sprich laut und bewerte dich selbst.'}</div>
-        <div class="row self" style="${canMic ? 'display:none' : ''}"><button class="btn ghost bad">Nochmal üben</button><button class="btn primary good">Gut gesagt</button></div>`;
+        <div class="row self" style="${canMic ? 'display:none' : ''}"><button class="btn ghost bad">Weiter (nicht geschafft)</button><button class="btn primary good">Richtig gesagt</button></div>`;
       bindSay(host);
       let finished = false;
       const fin = (ok, msg) => { if (finished) return; finished = true; host.dataset.done = 1; $$('button', host).forEach(b => b.disabled = true);
         api.result(ok, { id: o.id, mode: 'speak', err: 'speak', msg }); };
       $('.good', host).onclick = () => fin(true, '');
-      $('.bad', host).onclick = () => fin(false, 'Sprich es noch einmal langsam mit.');
-      $('.mic', host).onclick = async () => {
-        const hb = $('.heard', host); hb.textContent = 'Ich höre zu …'; $('.mic', host).classList.add('live');
+      $('.bad', host).onclick = () => fin(false, 'Hör dir das Vorbild nochmal an und achte auf Länge der Vokale und kleines っ.');
+      const mic = $('.mic', host);
+      mic.onclick = async () => {
+        const hb = $('.heard', host); hb.textContent = 'Ich höre zu …'; mic.classList.add('live');
         try {
-          const alts = await Voice.listen();
+          const alts = await Voice.listen(); mic.classList.remove('live');
           const targets = [o.say, ...(o.alt || [])];
+          const tn = targets.map(t => norm(P.reading(t))), ts = targets.map(t => norm(P.surface(t)));
+          const short = Math.min(...tn.map(x => x.length)) <= 2;
+          const hit = alts.some(a => { const n = norm(a); return tn.includes(n) || ts.includes(n) || tn.some(t => t && n.includes(t)) || ts.some(t => t && n.includes(t)); });
           const best = Math.max(...alts.flatMap(a => targets.map(t => Math.max(sim(a, P.reading(t)), sim(a, P.surface(t))))));
-          const exact = alts.some(a => targets.some(t => norm(a) === norm(P.reading(t)) || norm(a) === norm(P.surface(t))));
-          const ok = exact || best >= (o.strict || 0.8);
+          const ok = hit || best >= (o.strict || (short ? 0.5 : 0.7));
           hb.innerHTML = `Erkannt: <b class="jp">${esc(alts[0])}</b>`;
-          fin(ok, ok ? '' : 'Die Erkennung hat etwas anderes verstanden. Höre das Vorbild noch einmal und achte auf Länge der Vokale und kleines っ.');
+          if (ok) fin(true, '');
+          else { hb.innerHTML += `<br>Das passt noch nicht ganz. Versuche es nochmal oder bewerte dich selbst.`; mic.textContent = '🎤 Nochmal'; $('.self', host).style.display = ''; }
         } catch (e) {
-          $('.mic', host).classList.remove('live');
+          mic.classList.remove('live');
           hb.textContent = e.message === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bewerte dich selbst.' : 'Nichts erkannt. Versuche es erneut oder bewerte dich selbst.';
-          $('.self', host).style.display = '';
+          mic.textContent = '🎤 Nochmal'; $('.self', host).style.display = '';
         }
       };
     },

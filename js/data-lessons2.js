@@ -176,7 +176,7 @@ LESSONS.push(
       turns: [
         { a: 'どう|しました|か。', hint: 'Du suchst den Bahnhof. Frage höflich nach dem Weg.', o: ['すみません、えき|は|どこ|です|か。', 'すみません、わたし|は|えき|です。', 'さようなら。'] },
         { a: 'えき|です|か。まっすぐ|行[い]|って、右[みぎ]|です。', hint: 'Bedanke dich.', o: ['ありがとう|ございます。', 'ごめんなさい。', 'こんばんは。'] },
-        { a: 'どういたしまして。', hint: 'Verabschiede dich.', o: ['さようなら。', 'はじめまして。', 'いただきます。'] },
+        { a: 'どういたしまして。', hint: 'Bedanke dich zum Abschied noch einmal.', o: ['ありがとう|ございました。', 'はじめまして。', 'いただきます。'] },
       ],
     },
   },

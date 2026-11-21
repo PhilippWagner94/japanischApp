@@ -8,7 +8,10 @@ function pct(x) { return Math.round(x * 100); }
 
 /* ---------- Fortschritts-Hilfen ---------- */
 const lessonDone = id => !!(S.lessons[id] && S.lessons[id].done);
-const nextLesson = () => { for (const u of UNITS) for (const id of u.lessons) if (!lessonDone(id)) return LESSON_BY_ID[id]; return null; };
+const isSkipped = id => !!(S.placement && (S.placement.skipped || []).includes(id));
+const nextLesson = () => { for (const u of UNITS) for (const id of u.lessons) if (!lessonDone(id) && !isSkipped(id)) return LESSON_BY_ID[id]; return null; };
+const totalSec = () => Object.values(S.days).reduce((a, d) => a + (d.sec || 0), 0);
+const fmtTime = sec => { const m = Math.round(sec / 60); return m < 60 ? `${m} Min` : `${Math.floor(m / 60)} Std ${m % 60} Min`; };
 const totalPoints = () => Object.values(S.lessons).filter(x => x.done).length;
 function deckStats(filter) {
   const ids = Object.keys(Items).filter(id => filter(Items[id]));
@@ -152,13 +155,53 @@ function startPlacement() {
     rec.right.forEach(id => { const s = st(id); s.ok[MODES_BY_KIND[Items[id].kind][0]] = 2; s.reps = 2; s.ivl = 4; s.step = 2; s.due = NOW() + 4 * DAY; s.seen = 1; });
     rec.wrong.forEach(id => { const s = st(id); s.due = NOW(); s.lapses = 1; s.seen = 1; });
     S.placement = { date: dayKey(), hira: rec.right.filter(i => /^ka:[ぁ-ゖ]/.test(i)).length + '/' + hira.length, kata: rec.right.filter(i => /^ka:[ァ-ヶ]/.test(i)).length + '/' + kata.length, words: rec.right.filter(i => i.startsWith('w:')).length + '/' + words.length, kanji: rec.right.filter(i => i.startsWith('kj:')).length + '/' + kanji.length };
-    S.onboarded = true; Store.save();
-    const p = S.placement;
+    S.onboarded = true;
+    /* Empfehlung: erste Lektion im Pfad, die noch nicht sicher sitzt */
+    const okSet = new Set(rec.right);
+    const hiraOk = rec.right.filter(i => /^ka:[ぁ-ゖ]/.test(i)).length / hira.length, kataOk = rec.right.filter(i => /^ka:[ァ-ヶ]/.test(i)).length / kata.length;
+    const known = id => { const l = LESSON_BY_ID[id]; if (l.type === 'kana') return (l.groups[0].startsWith('h-') ? hiraOk : kataOk) >= 0.8; const t = words.filter(w => Items[w].lesson === id); return t.length > 0 && t.every(w => okSet.has(w)); };
+    const order = UNITS.flatMap(u => u.lessons); let first = order.find(id => !known(id)) || order[order.length - 1];
+    const skipIds = order.slice(0, order.indexOf(first));
+    S.placement.rec = first; S.placement.skipCandidates = skipIds; S.placement.skipped = []; Store.save();
+    const p = S.placement, fl = LESSON_BY_ID[first];
+    const hints = [];
+    if (hiraOk < 0.8) hints.push('Hiragana sitzt noch nicht sicher: Die Kana-Lektionen helfen dir am meisten.');
+    if (kataOk < 0.8) hints.push('Katakana braucht noch Übung.');
+    if (p.kanji.startsWith('0/') || p.kanji.startsWith('1/')) hints.push('Kanji sind für dich noch neu, das ist völlig normal.');
     view().innerHTML = `<div class="done"><div class="trophy">📊</div><h2>Einstufung abgeschlossen</h2>
       <div class="card"><div class="kv"><span>Hiragana</span><b>${p.hira}</b></div><div class="kv"><span>Katakana</span><b>${p.kata}</b></div><div class="kv"><span>Wörter</span><b>${p.words}</b></div><div class="kv"><span>Kanji</span><b>${p.kanji}</b></div></div>
-      <p>Was du konntest, wird später nur noch wiederholt. Was nicht, kommt gezielt in die Wiederholung. Du kannst jede Lektion frei starten, auch wenn du Teile schon kennst.</p>
-      <div class="stack"><button class="btn primary big" data-a="go">Los geht's</button></div></div>`;
+      <div class="card"><h3>Empfehlung</h3>${skipIds.length ? `<p>Starte bei <b>${esc(fl.title)}</b>. Die ${skipIds.length} Lektion(en) davor hast du im Test überwiegend richtig beantwortet.</p>` : `<p>Starte ganz vorne bei <b>${esc(fl.title)}</b>.`}</p>${hints.map(h => `<p class="muted">${esc(h)}</p>`).join('')}
+      <p class="muted small">Der Test prüft nur wenige Elemente und ist deshalb vorsichtig gewertet. Übersprungene Lektionen bleiben jederzeit startbar, und ihre Wörter kommen in den nächsten Tagen zur Wiederholung, damit sich Lücken zeigen.</p></div>
+      <div class="stack">${skipIds.length ? `<button class="btn primary big" data-a="apply">Empfehlung übernehmen</button><button class="btn big" data-a="go">Trotzdem ganz vorne anfangen</button>` : `<button class="btn primary big" data-a="go">Los geht's</button>`}</div></div>`;
+    const apply = $('[data-a=apply]');
+    if (apply) apply.onclick = () => {
+      S.placement.skipped = skipIds.slice();
+      skipIds.forEach(id => lessonItems(LESSON_BY_ID[id]).forEach(iid => { if (!S.items[iid]) { const x = st(iid); x.step = 1; x.due = NOW() + (1 + rnd(5)) * DAY; } }));
+      Store.save(); go('today');
+    };
     $('[data-a=go]').onclick = () => go('today');
+  });
+}
+
+/* ---------- Schnelltest pro Lektion ---------- */
+function startTestOut(id) {
+  const l = LESSON_BY_ID[id];
+  if (!confirm(`Schnelltest „${l.title}“: etwa 16 gemischte Fragen. Ab 85 % gilt die Lektion als geschafft (+1 Punkt). Starten?`)) return;
+  const ids = pick(lessonItems(l), 16);
+  const modes = { kana: ['read', 'hear', 'type'], word: ['mc', 'mcr', 'hear', 'type'], kanji: ['read', 'mc'] };
+  const rec = recorder({ missed: [] });
+  const qs = ids.map((iid, i) => { const k = Items[iid].kind; const list = modes[k]; return itemQ(iid, list[i % list.length]); });
+  playerShell('Schnelltest'); $('.pbar').style.display = 'none';
+  bindX(() => go('path'));
+  runQuestions(qs, { label: `⏩ Schnelltest · ${l.title}`, onResult: rec.onResult }, () => {
+    leavePlayer(); const acc = rec.total ? rec.ok / rec.total : 0, passed = acc >= 0.85;
+    const prev = S.lessons[id] || {}, first = passed && !prev.done;
+    if (passed) { S.lessons[id] = { done: true, acc: Math.max(prev.acc || 0, acc), last: acc, tries: (prev.tries || 0) + 1, date: dayKey(), quick: true }; touchDay({ lessons: 1 }); }
+    Store.save();
+    view().innerHTML = `<div class="done"><div class="trophy">${passed ? '⏩' : '💪'}</div><h2>${passed ? 'Lektion übersprungen und geschafft' : 'Noch nicht ganz'}</h2><p class="big">${rec.ok} von ${rec.total} richtig (${pct(acc)} %)</p>
+      <p>${passed ? (first ? '<b>+1 Punkt</b>. Die Wörter kommen weiter in der Wiederholung vor.' : 'Die Lektion war schon geschafft.') : 'Für den Schnelltest braucht es 85 %. Mach am besten die ganze Lektion, dann sitzt es sicher.'}</p>
+      <div class="stack"><button class="btn primary big" data-a="home">Zum Lernpfad</button>${passed ? '' : `<button class="btn big" data-a="les">Lektion starten</button>`}</div></div>`;
+    $('[data-a=home]').onclick = () => go('path'); const b = $('[data-a=les]'); if (b) b.onclick = () => startLesson(id, 0);
   });
 }
 
@@ -174,7 +217,7 @@ function viewToday() {
   const weakTypes = Object.entries(S.errors).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const resume = S.resume && LESSON_BY_ID[S.resume.id];
   view().innerHTML = `
-    <div class="hello"><div><h1>${new Date().getHours() < 11 ? 'おはよう' : new Date().getHours() < 18 ? 'こんにちは' : 'こんばんは'}</h1><p class="muted">Heute ${mins} von ${goal} Minuten</p></div>
+    <div class="hello"><div><h1>${new Date().getHours() < 11 ? 'おはよう' : new Date().getHours() < 18 ? 'こんにちは' : 'こんばんは'}</h1><p class="muted">Heute ${mins} von ${goal} Minuten · Gesamt ${fmtTime(totalSec())}</p></div>
       <div class="chips-top"><span class="pill">🔥 ${S.streak}</span><span class="pill">⭐ ${totalPoints()}</span></div></div>
     ${ring(mins / goal, `${mins}′`, 'Tagesziel')}
     <div class="stack">
@@ -193,11 +236,13 @@ function viewToday() {
 
 function viewPath() {
   const nl = nextLesson();
-  view().innerHTML = `<h1>Lernpfad</h1><p class="muted">⭐ ${totalPoints()} von ${LESSONS.length} Lektionen · jede Lektion = 19 Übungen</p>` + UNITS.map(u => `
+  view().innerHTML = `<h1>Lernpfad</h1><p class="muted">⭐ ${totalPoints()} von ${LESSONS.length} Lektionen · jede Lektion = 19 Übungen · ⏩ = Schnelltest zum Überspringen</p>` + UNITS.map(u => `
     <div class="unit"><h3>${esc(u.title)}</h3><p class="muted small">${esc(u.desc)}</p>
       <div class="lessons">${u.lessons.map(id => { const l = LESSON_BY_ID[id]; const d = S.lessons[id]; const cur = nl && nl.id === id;
-        return `<button class="lesson ${d && d.done ? 'done' : ''} ${cur ? 'current' : ''}" data-l="${id}"><span class="li">${esc(l.icon)}</span><div><b>${esc(l.title)}</b><small>${l.type === 'kana' ? esc(l.sub) : l.words.length + ' Wörter' + (l.kanji ? ' · ' + l.kanji.length + ' Kanji' : '')}</small></div><span class="st">${d && d.done ? '⭐ ' + pct(d.acc) + '%' : cur ? '▶' : ''}</span></button>`; }).join('')}</div></div>`).join('')
+        const sk = isSkipped(id) && !(d && d.done);
+        return `<div class="lesson-wrap"><button class="lesson ${d && d.done ? 'done' : ''} ${cur ? 'current' : ''} ${sk ? 'skipped' : ''}" data-l="${id}"><span class="li">${esc(l.icon)}</span><div><b>${esc(l.title)}</b><small>${l.type === 'kana' ? esc(l.sub) : l.words.length + ' Wörter' + (l.kanji ? ' · ' + l.kanji.length + ' Kanji' : '')}</small></div><span class="st">${d && d.done ? '⭐ ' + pct(d.acc) + '%' : sk ? '⏭ übersprungen' : cur ? '▶' : ''}</span></button>${d && d.done ? '' : `<button class="quick" data-q="${id}" aria-label="Schnelltest" title="Schnelltest: Lektion überspringen">⏩</button>`}</div>`; }).join('')}</div></div>`).join('')
     + `<p class="muted center small">Weitere Einheiten (Verben, Wünsche, Gründe, längere Gespräche) folgen in den nächsten Ausbaustufen.</p>`;
+  $$('[data-q]').forEach(b => b.onclick = () => startTestOut(b.dataset.q));
   $$('[data-l]').forEach(b => b.onclick = () => { const id = b.dataset.l; if (S.resume && S.resume.id === id && confirm('Fortsetzen, wo du aufgehört hast?\n(OK = fortsetzen, Abbrechen = neu starten)')) startLesson(id); else { if (S.resume && S.resume.id === id) S.resume = null; startLesson(id, 0); } });
 }
 
@@ -274,7 +319,7 @@ function viewStats() {
   view().innerHTML = `${backBtn()}<h1>Statistik</h1>
     <div class="grid3"><div class="stat"><b>${S.streak}</b><small>Tage am Stück</small></div><div class="stat"><b>${S.best}</b><small>Rekord</small></div><div class="stat"><b>${totalPoints()}</b><small>Punkte</small></div></div>
     <h3>Lernzeit der letzten 14 Tage</h3><div class="bars">${days.map(x => `<div class="b"><i style="height:${Math.max(3, ((x.d.sec || 0) / mx) * 100)}%"></i><small>${x.k.slice(8)}</small></div>`).join('')}</div>
-    <div class="card"><div class="kv"><span>Antworten insgesamt</span><b>${totRev}</b></div><div class="kv"><span>Davon richtig</span><b>${totRev ? pct(totOk / totRev) : 0} %</b></div><div class="kv"><span>Wörter gemeistert</span><b>${s.w.mast} / ${s.w.total}</b></div><div class="kv"><span>Kana gemeistert</span><b>${s.ka.mast} / ${s.ka.total}</b></div><div class="kv"><span>Kanji gemeistert</span><b>${s.k.mast} / ${s.k.total}</b></div></div>
+    <div class="card"><div class="kv"><span>Gesamte Lernzeit</span><b>${fmtTime(totalSec())}</b></div><div class="kv"><span>Antworten insgesamt</span><b>${totRev}</b></div><div class="kv"><span>Davon richtig</span><b>${totRev ? pct(totOk / totRev) : 0} %</b></div><div class="kv"><span>Wörter gemeistert</span><b>${s.w.mast} / ${s.w.total}</b></div><div class="kv"><span>Kana gemeistert</span><b>${s.ka.mast} / ${s.ka.total}</b></div><div class="kv"><span>Kanji gemeistert</span><b>${s.k.mast} / ${s.k.total}</b></div></div>
     <h3>Fehlerarten</h3><div class="card">${e.length ? e.map(([k, v]) => `<div class="kv"><span>${esc(ERR_LABEL[k] || (k === 'dialog' ? 'Gespräch' : k))}</span><b>${v}</b></div>${bar(v / sum)}`).join('') : '<p class="muted">Noch keine Fehler erfasst.</p>'}</div>
     <h3>Aktuelle Schwächen</h3><div class="card">${weak.length ? weak.map(id => { const it = Items[id]; return `<div class="kv"><span class="jp">${esc(it.kind === 'kana' ? it.ch : it.kind === 'word' ? (it.kanji || it.kana) : it.c)}</span><b>${esc(it.kind === 'kana' ? it.ro : it.de)}</b></div>`; }).join('') : '<p class="muted">Keine auffälligen Schwächen.</p>'}${weak.length ? '<div class="stack"><button class="btn primary" data-a="weak">Jetzt üben</button></div>' : ''}</div>`;
   bindBack(); const w = $('[data-a=weak]'); if (w) w.onclick = weakSession;
@@ -310,10 +355,11 @@ function viewSettings() {
     <label class="set">Mindest-Quote für den Lektionspunkt (%)<select id="s-acc">${[0, 50, 60, 70, 80, 90].map(v => `<option ${v === s.minAcc ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="set">Sprechtempo<select id="s-rate">${[[0.6, 'sehr langsam'], [0.75, 'langsam'], [0.85, 'normal'], [1, 'schnell']].map(v => `<option value="${v[0]}" ${v[0] === s.rate ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></label>
     <label class="set">Furigana (Lesehilfe) anzeigen<input type="checkbox" id="s-furi" ${s.furigana ? 'checked' : ''}></label>
-    <label class="set">Romaji-Hilfe bei Lese-Übungen<input type="checkbox" id="s-ro" ${s.romajiHelp ? 'checked' : ''}></label></div>
+    <label class="set">Romaji-Hilfe bei Lese-Übungen<input type="checkbox" id="s-ro" ${s.romajiHelp ? 'checked' : ''}></label>
+    <label class="set">Kana-Auswahl statt Tastatur beim Schreiben<input type="checkbox" id="s-pad" ${s.padInput !== false ? 'checked' : ''}></label></div>
     <div class="card"><h3>Sprachausgabe</h3><p id="vinfo" class="muted"></p><button class="btn" id="vtest">Testsatz anhören</button></div>`;
   bindBack();
-  const save = () => { s.dailyGoal = +$('#s-goal').value; s.mastery = +$('#s-mast').value; s.minAcc = +$('#s-acc').value; s.rate = +$('#s-rate').value; s.furigana = $('#s-furi').checked; s.romajiHelp = $('#s-ro').checked; Store.save(); };
+  const save = () => { s.dailyGoal = +$('#s-goal').value; s.mastery = +$('#s-mast').value; s.minAcc = +$('#s-acc').value; s.rate = +$('#s-rate').value; s.furigana = $('#s-furi').checked; s.romajiHelp = $('#s-ro').checked; s.padInput = $('#s-pad').checked; Store.save(); };
   $$('select,input').forEach(e => e.onchange = save);
   $('#vinfo').textContent = Voice.ready ? `Japanische Stimme gefunden: ${Voice.voice.name}` : 'Keine japanische Stimme gefunden. Installiere in den Geräteeinstellungen ein japanisches Sprachpaket für Text-to-Speech.';
   $('#vtest').onclick = () => Voice.speak('こんにちは。はじめまして。');

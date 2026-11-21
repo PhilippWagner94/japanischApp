@@ -66,3 +66,11 @@ label.set{display:flex;justify-content:space-between;align-items:center;gap:12px
 .readtext{font-size:22px;line-height:2;margin:8px 0}.examples .ex{padding:8px 0;border-top:1px solid var(--line)}details summary{cursor:pointer;color:var(--pri);margin:8px 0}
 #toast{position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);background:#222;color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:.3s;pointer-events:none;z-index:20}#toast.show{opacity:1;transform:translate(-50%,0)}
 .back{margin:-6px 0 0 -10px}.deck b{display:block}
+
+.padwrap{margin:6px 0}.seg.small{margin:4px 0}.seg.small button{padding:6px}
+.pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:34vh;overflow:auto;padding:4px;background:var(--card);border-radius:14px}
+.pk{border:1px solid var(--line);background:var(--bg);border-radius:10px;font-size:22px;min-height:44px}.pk:active{background:var(--line)}
+.linkbtn{border:0;background:none;color:var(--pri);text-decoration:underline;font-size:14px;padding:8px}
+.seg .del{flex:0 0 52px}
+.lesson-wrap{display:flex;gap:6px;align-items:stretch}.lesson-wrap .lesson{flex:1}.quick{border:0;background:var(--card);border-radius:16px;box-shadow:var(--shadow);width:48px;font-size:18px}
+.lesson.skipped{opacity:.6}

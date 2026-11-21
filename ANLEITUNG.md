@@ -41,3 +41,8 @@ Mehr Lektionen (Vergangenheit, て-Form, Wünsche, Gründe, Höflichkeitsstufen)
 
 ## 7. Hinweis zu den Inhalten
 Alle Inhalte sind selbst erstellt und nicht von einer Muttersprachlerin / einem Muttersprachler geprüft. Falls dir etwas komisch vorkommt, sag mir Bescheid, ich korrigiere es.
+
+## Update einspielen (Version 1.1)
+Lade im GitHub-Repository alle Dateien aus diesem Ordner erneut hoch und überschreibe die alten (besonders `js/`, `style.css`, `sw.js`). Warte 1 bis 2 Minuten, öffne die App einmal mit Internet und schließe sie danach komplett. Beim nächsten Öffnen ist die neue Version aktiv. Deine Lerndaten bleiben dabei erhalten.
+
+Neu in 1.1: Kana-Auswahl statt Tastatur beim Schreiben, natürlichere Verabschiedungen (またね), tolerantere Spracherkennung mit Selbstkorrektur, Gesamtlernzeit, Schnelltest ⏩ pro Lektion und Empfehlung nach dem Einstufungstest.
