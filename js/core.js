@@ -208,28 +208,65 @@ const ERR_LABEL = {
 
 /* ===== Sprachausgabe und Spracherkennung ===== */
 const Voice = {
-  voice: null, ready: false,
-  init() {
+  voice: null, ready: false, list: [], lastError: '', lastOk: 0, _errAt: 0,
+  loadVoices() {
     if (!('speechSynthesis' in window)) return;
-    const load = () => {
-      const vs = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
-      /* bevorzugt hochwertige Stimmen */
-      this.voice = vs.find(v => /Kyoko|Otoya|Google|Enhanced|Premium|Neural|Online/i.test(v.name)) || vs[0] || null;
-      this.ready = !!this.voice;
-    };
-    load(); speechSynthesis.onvoiceschanged = load;
+    this.list = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang) || /japan|日本/i.test(v.name));
+    this.voice = this.pickVoice();
+    this.ready = this.list.length > 0;
+  },
+  pickVoice() {
+    const sel = S.settings.voiceName && this.list.find(v => v.name === S.settings.voiceName);
+    return sel || this.list.find(v => /Kyoko|Otoya|Google|Enhanced|Premium|Neural|Online/i.test(v.name)) || this.list[0] || null;
+  },
+  /* Kandidaten in Reihenfolge: gewählte Stimme, lokale Stimmen, alle anderen, zuletzt nur die Sprache */
+  candidates() {
+    const first = this.pickVoice();
+    const c = [first, ...this.list.filter(v => v.localService), ...this.list].filter(Boolean);
+    const out = []; c.forEach(v => { if (!out.includes(v)) out.push(v); });
+    out.push(null); return out;
+  },
+  init() {
+    if (!('speechSynthesis' in window)) { this.lastError = 'Dieser Browser hat keine Sprachausgabe.'; return; }
+    this.loadVoices(); speechSynthesis.onvoiceschanged = () => this.loadVoices();
+    /* Audio beim ersten Antippen „entsperren“ (nötig auf manchen Android/iOS-Geräten) */
+    const unlock = () => { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'ja-JP'; speechSynthesis.speak(u); } catch (e) { /* ignorieren */ } };
+    document.addEventListener('pointerdown', unlock, { once: true });
+  },
+  fail(msg) {
+    this.lastError = msg;
+    if (NOW() - this._errAt > 20000) { this._errAt = NOW(); if (typeof toast === 'function') toast('Kein Ton: ' + msg + ' (Mehr → Einstellungen → Ton-Diagnose)'); }
   },
   speak(text, rate) {
     return new Promise(res => {
-      if (!('speechSynthesis' in window)) return res(false);
-      try { speechSynthesis.cancel(); } catch (e) { /* ignorieren */ }
-      const t = P.reading(text).replace(/[｜|]/g, '').replace(/～/g, '').replace(/[ＡＢ]：/g, '');
-      const u = new SpeechSynthesisUtterance(t);
-      u.lang = 'ja-JP'; if (this.voice) u.voice = this.voice;
-      u.rate = rate || S.settings.rate; u.pitch = 1;
-      u.onend = () => res(true); u.onerror = () => res(false);
-      speechSynthesis.speak(u);
-      setTimeout(() => res(true), 15000);
+      if (!('speechSynthesis' in window)) { this.fail('Keine Sprachausgabe im Browser'); return res(false); }
+      const synth = speechSynthesis;
+      this.stopListening();
+      if (!this.list.length) this.loadVoices();
+      const t = P.reading(text).replace(/[｜|]/g, '').replace(/～/g, '').replace(/[ＡＢ]：/g, '').trim();
+      if (!t) return res(false);
+      const cands = this.candidates(); let idx = 0, settled = false;
+      const done = v => { if (!settled) { settled = true; res(v); } };
+      const attempt = () => {
+        const v = cands[idx++]; let started = false, over = false;
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = 'ja-JP'; try { if (v) u.voice = v; } catch (e) { /* Stimme nicht setzbar: Systemstimme */ } u.rate = rate || S.settings.rate; u.pitch = 1; u.volume = 1;
+        const next = why => {
+          if (over) return; over = true; clearTimeout(wd);
+          if (idx < cands.length) { try { synth.cancel(); } catch (e) { /* ignorieren */ } setTimeout(attempt, 120); }
+          else { this.fail(why || 'Stimme antwortet nicht'); done(false); }
+        };
+        u.onstart = () => { started = true; this.lastOk = NOW(); this.lastError = ''; };
+        u.onend = () => { if (!over) { over = true; clearTimeout(wd); done(true); } };
+        u.onerror = e => { if (e.error === 'canceled' || e.error === 'interrupted') { if (!over) { over = true; clearTimeout(wd); done(false); } return; } next(e.error || 'Fehler der Stimme'); };
+        const wd = setTimeout(() => { if (!started) next('Keine Reaktion der Stimme'); }, 4000);
+        try { synth.speak(u); } catch (e) { next(e.message); }
+      };
+      try {
+        if (synth.speaking || synth.pending || synth.paused) { synth.cancel(); setTimeout(() => { try { synth.resume(); } catch (e) { /* ignorieren */ } attempt(); }, 120); }
+        else { try { synth.resume(); } catch (e) { /* ignorieren */ } attempt(); }
+      } catch (e) { attempt(); }
+      setTimeout(() => done(true), 25000);
     });
   },
   canListen() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); },

@@ -357,12 +357,25 @@ function viewSettings() {
     <label class="set">Furigana (Lesehilfe) anzeigen<input type="checkbox" id="s-furi" ${s.furigana ? 'checked' : ''}></label>
     <label class="set">Romaji-Hilfe bei Lese-Übungen<input type="checkbox" id="s-ro" ${s.romajiHelp ? 'checked' : ''}></label>
     <label class="set">Kana-Auswahl statt Tastatur beim Schreiben<input type="checkbox" id="s-pad" ${s.padInput !== false ? 'checked' : ''}></label></div>
-    <div class="card"><h3>Sprachausgabe</h3><p id="vinfo" class="muted"></p><button class="btn" id="vtest">Testsatz anhören</button></div>`;
+    <div class="card"><h3>Ton-Diagnose</h3><p id="vinfo" class="muted"></p>
+      <label class="set">Stimme<select id="s-voice"></select></label>
+      <div class="stack"><button class="btn" id="vtest">Testsatz anhören</button><button class="btn" id="vtest2">Mit Systemstimme testen (ohne Auswahl)</button></div>
+      <p id="vstat" class="muted small"></p>
+      <p class="muted small">Kein Ton? Prüfe: 1) Medienlautstärke (nicht Klingelton) hochdrehen, Stumm-Schalter aus. 2) Android: Einstellungen → Sprache → Text-to-Speech → „Wiedergabe“ testen und japanische Sprachdaten installieren. 3) App/Browser einmal komplett schließen und neu öffnen. 4) Nach der Mikrofon-Nutzung hilft manchmal ein Neustart des Browsers.</p></div>`;
   bindBack();
   const save = () => { s.dailyGoal = +$('#s-goal').value; s.mastery = +$('#s-mast').value; s.minAcc = +$('#s-acc').value; s.rate = +$('#s-rate').value; s.furigana = $('#s-furi').checked; s.romajiHelp = $('#s-ro').checked; s.padInput = $('#s-pad').checked; Store.save(); };
   $$('select,input').forEach(e => e.onchange = save);
-  $('#vinfo').textContent = Voice.ready ? `Japanische Stimme gefunden: ${Voice.voice.name}` : 'Keine japanische Stimme gefunden. Installiere in den Geräteeinstellungen ein japanisches Sprachpaket für Text-to-Speech.';
-  $('#vtest').onclick = () => Voice.speak('こんにちは。はじめまして。');
+  const fillVoices = () => {
+    Voice.loadVoices();
+    const sel = $('#s-voice'); if (!sel) return;
+    sel.innerHTML = `<option value="">Automatisch</option>` + Voice.list.map(v => `<option value="${esc(v.name)}" ${v.name === S.settings.voiceName ? 'selected' : ''}>${esc(v.name)} (${v.localService ? 'lokal' : 'online'})</option>`).join('');
+    $('#vinfo').textContent = Voice.list.length ? `${Voice.list.length} japanische Stimme(n) gefunden. Aktiv: ${Voice.voice ? Voice.voice.name : 'Systemstandard'}` : 'Keine japanische Stimme gefunden. Installiere in den Geräteeinstellungen ein japanisches Sprachpaket für Text-to-Speech.';
+  };
+  fillVoices(); setTimeout(fillVoices, 800);
+  $('#s-voice').onchange = e => { S.settings.voiceName = e.target.value; Store.save(); Voice.loadVoices(); };
+  const stat = () => { $('#vstat').textContent = Voice.lastError ? `Letzter Fehler: ${Voice.lastError}` : (Voice.lastOk ? 'Letzte Ausgabe war erfolgreich.' : ''); };
+  $('#vtest').onclick = async () => { await Voice.speak('こんにちは。はじめまして。'); stat(); };
+  $('#vtest2').onclick = () => { try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance('こんにちは'); u.lang = 'ja-JP'; u.onerror = e => { $('#vstat').textContent = 'Systemstimme: Fehler ' + e.error; }; u.onstart = () => { $('#vstat').textContent = 'Systemstimme spricht.'; }; speechSynthesis.speak(u); } catch (e) { $('#vstat').textContent = 'Fehler: ' + e.message; } };
 }
 function viewBackup() {
   view().innerHTML = `${backBtn()}<h1>Backup</h1><div class="card"><p>Deine Lerndaten liegen nur auf diesem Gerät. Exportiere sie regelmäßig, um nichts zu verlieren, und um zwischen Handy und PC zu wechseln.</p>

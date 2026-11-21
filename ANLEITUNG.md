@@ -46,3 +46,6 @@ Alle Inhalte sind selbst erstellt und nicht von einer Muttersprachlerin / einem 
 Lade im GitHub-Repository alle Dateien aus diesem Ordner erneut hoch und überschreibe die alten (besonders `js/`, `style.css`, `sw.js`). Warte 1 bis 2 Minuten, öffne die App einmal mit Internet und schließe sie danach komplett. Beim nächsten Öffnen ist die neue Version aktiv. Deine Lerndaten bleiben dabei erhalten.
 
 Neu in 1.1: Kana-Auswahl statt Tastatur beim Schreiben, natürlichere Verabschiedungen (またね), tolerantere Spracherkennung mit Selbstkorrektur, Gesamtlernzeit, Schnelltest ⏩ pro Lektion und Empfehlung nach dem Einstufungstest.
+
+## Update 1.2: Ton
+Die Sprachausgabe probiert jetzt automatisch andere Stimmen, wenn die gewählte nicht antwortet, und zeigt eine Meldung statt Stille. Unter Mehr → Einstellungen → Ton-Diagnose kannst du eine Stimme auswählen und testen.
