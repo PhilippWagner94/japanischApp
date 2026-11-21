@@ -35,6 +35,11 @@ LESSONS.push(
       ['またね', '', 'Bis dann / Tschüss (locker)', '👋'],
       ['しつれいします', '', 'Verzeihung beim Gehen oder Eintreten (formell)', '🚪'],
       ['さようなら', '', 'Auf Wiedersehen (förmlich, im Alltag selten)', '🖐️'],
+      ['ありがとう', '', 'danke (locker)', '🙏'],
+      ['どうも', '', 'danke / hallo (lässig)', '👍'],
+      ['ほんとうに', '', 'wirklich', '💯'],
+      ['おはよう', '', 'Guten Morgen (locker)', '🌅'],
+      ['じゃあ、また', '', 'Dann bis später', '🖐️'],
       ['おやすみなさい', '', 'Gute Nacht', '😴'],
     ],
     sents: [
@@ -68,7 +73,7 @@ LESSONS.push(
       turns: [
         { a: 'おはよう|ございます。', hint: 'Es ist morgens. Erwidere den Gruß.', o: ['おはよう|ございます。', 'こんばんは。', 'おやすみなさい。'] },
         { a: 'ありがとう|ございます。', hint: 'Jemand bedankt sich bei dir.', o: ['どういたしまして。', 'ごめんなさい。', 'こんばんは。'] },
-        { a: 'じゃあ、また。', hint: 'Verabschiede dich locker unter Bekannten (bis dann).', o: ['またね。', 'はじめまして。', 'おはよう|ございます。'] },
+        { a: 'じゃあ、また。', hint: 'Verabschiede dich locker unter Bekannten (bis dann).', o: ['またね。', 'こんにちは。', 'おはよう|ございます。'] },
       ],
     },
   },
@@ -102,6 +107,8 @@ LESSONS.push(
       ['にほんじん', '日本人', 'Japaner/in', '🇯🇵'],
       ['がくせい', '学生', 'Student/in', '🎓'],
       ['せんせい', '', 'Lehrer/in', '👩‍🏫'],
+      ['どうぞ', '', 'bitte (anbietend), bitte sehr', '🙌'],
+      ['にほんご', '日本語', 'Japanisch (Sprache)', '🇯🇵'],
     ],
     kanji: ['人', '日', '本', '学', '生'],
     sents: [
@@ -162,12 +169,14 @@ LESSONS.push(
       ['ほん', '本', 'Buch', '📖'],
       ['かさ', '', 'Regenschirm', '☂️'],
       ['かばん', '', 'Tasche', '👜'],
+      ['ひと', '人', 'Person, Mensch', '🧑'],
+      ['なに', '何', 'was (andere Lesung von 何, z. B. vor を)', '🤔'],
     ],
     kanji: ['何'],
     sents: [
       { s: 'これ|は|何[なん]|です|か', de: 'Was ist das?' },
       { s: 'それ|は|ほん|です', de: 'Das ist ein Buch.' },
-      { s: 'あれ|は|ホテル|です|か', de: 'Ist das dort ein Hotel?' },
+      { s: 'あれ|は|かばん|です|か', de: 'Ist das dort eine Tasche?' },
       { s: 'あの|人[ひと]|は|だれ|です|か', de: 'Wer ist diese Person dort?' },
       { s: 'これ|は|かばん|では|ありません', de: 'Das ist keine Tasche.' },
       { s: 'わたし|は|学生[がくせい]|じゃ|ありません', de: 'Ich bin kein Student.' },
@@ -214,6 +223,7 @@ LESSONS.push(
       ['よん', '四', 'vier', '4️⃣'], ['ご', '五', 'fünf', '5️⃣'], ['ろく', '六', 'sechs', '6️⃣'],
       ['なな', '七', 'sieben', '7️⃣'], ['はち', '八', 'acht', '8️⃣'], ['きゅう', '九', 'neun', '9️⃣'],
       ['じゅう', '十', 'zehn', '🔟'], ['ゼロ', '', 'null', '0️⃣'], ['さい', '', '... Jahre alt', '🎂'],
+      ['でんわ', '電話', 'Telefon', '📞'], ['ばんごう', '番号', 'Nummer', '🔢'],
     ],
     kanji: ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'],
     sents: [
@@ -246,7 +256,7 @@ LESSONS.push(
       turns: [
         { a: 'いち、に、さん、…', hint: 'Zähle weiter: Welche Zahl kommt nach 3 (vier)?', o: ['よん。', 'ご。', 'ろく。'] },
         { a: 'ご、ろく、なな、…', hint: 'Welche Zahl kommt nach 7?', o: ['はち。', 'きゅう。', 'さん。'] },
-        { a: 'でんわ|ばんごう|を|おしえて|ください。', hint: 'Nenne die Nummer 090.', o: ['ゼロ、きゅう、ゼロ|です。', 'さようなら。', 'いいえ、ちがいます。'] },
+        { a: 'でんわ|ばんごう|は|何[なん]|です|か。', hint: 'Nenne die Nummer 090.', o: ['ゼロ、きゅう、ゼロ|です。', 'さようなら。', 'いいえ、ちがいます。'] },
       ],
     },
   },

@@ -74,3 +74,5 @@ label.set{display:flex;justify-content:space-between;align-items:center;gap:12px
 .seg .del{flex:0 0 52px}
 .lesson-wrap{display:flex;gap:6px;align-items:stretch}.lesson-wrap .lesson{flex:1}.quick{border:0;background:var(--card);border-radius:16px;box-shadow:var(--shadow);width:48px;font-size:18px}
 .lesson.skipped{opacity:.6}
+
+.tipbox{background:var(--bg);border-radius:12px;padding:6px 12px;margin:8px 0}.tipbox p{margin:6px 0;font-size:15px}

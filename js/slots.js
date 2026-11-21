@@ -12,7 +12,7 @@ function taker(list) {
 /* --- Distraktoren --- */
 function wordDists(it, n = 3) {
   const all = Object.values(Items).filter(x => x.kind === 'word' && x.id !== it.id && x.de !== it.de && x.kana !== it.kana && x.kana.length > 1);
-  const seen = x => S.items[x.id] || x.lesson === it.lesson;
+  const seen = x => (S.items[x.id] && !S.items[x.id].pending) || x.lesson === it.lesson;
   const pools = [shuffle(all.filter(x => x.lesson === it.lesson)), shuffle(all.filter(x => x.deck === it.deck && seen(x))), shuffle(all.filter(x => seen(x))), shuffle(all)];
   const out = []; const seenDe = new Set([it.de]);
   for (const p of pools) for (const x of p) { if (out.length >= n) break; if (!seenDe.has(x.de) && !out.includes(x)) { out.push(x); seenDe.add(x.de); } }
@@ -151,7 +151,18 @@ function contentSlots(l) {
   const add = (name, icon, build) => slots.push({ name, icon, build });
 
   add('Aufwärmen', '🔥', () => warmupQs(l, ctx));
-  add('Neue Wörter', '🆕', () => [carouselQ({ title: 'Neue Wörter', cards: wordItems.map(it => ({ say: it.kana, html: `<div class="card wcard"><div class="emoji">${it.emoji}</div>${wordHtml(it, true)}<div class="roma">${esc(romaOf(it.kana))}</div><div class="de">${esc(it.de)}</div>${playBtn(it.kana, 'lg')} ${slowBtn(it.kana)}</div>` })) })]);
+  add('Neue Wörter', '🆕', () => {
+    lessonItems(l).forEach(id => { if (S.items[id]) delete S.items[id].pending; });
+    const fresh = wordItems.filter(it => it.lesson === l.id);
+    const cards = fresh.map(it => ({ say: it.kana, html: `<div class="card wcard"><div class="emoji">${it.emoji}</div>${wordHtml(it, true)}<div class="roma">${esc(romaOf(it.kana))}</div><div class="de">${esc(it.de)}</div>${playBtn(it.kana, 'lg')} ${slowBtn(it.kana)}</div>` }));
+    if (kanjiIds.length) cards.push({ html: `<div class="card"><h3>Neue Kanji in dieser Lektion</h3><div class="kanji-list">${kanjiIds.map(id => { const k = Items[id]; return `<div class="kj"><div class="kj-c">${esc(k.c)}</div><div><b>${esc(k.de)}</b><div class="muted">On: ${esc(k.on)}${k.kun ? ' · Kun: ' + esc(k.kun) : ''}</div>${k.hint ? `<div class="muted">💡 ${esc(k.hint)}</div>` : ''}<div class="muted">${k.words.map(w => `<span class="jp">${esc(w[0])}</span> (${esc(w[1])}) ${esc(w[2])}`).join(' · ')}</div></div></div>`; }).join('')}</div></div>` });
+    return [carouselQ({ title: 'Neue Wörter und Kanji', cards })];
+  });
+  add('Grammatik', '📘', () => {
+    const g = l.grammar;
+    return [infoQ({ title: g.title, html: `<div class="card"><h3>${esc(g.title)}</h3>${g.body.map(b => `<p>${esc(b)}</p>`).join('')}<div class="examples">${g.ex.map(e => `<div class="ex"><span class="jp">${P.html(e[0], S.settings.furigana)}</span>${playBtn(P.reading(e[0]))}<div class="muted">${esc(e[1])}</div></div>`).join('')}</div></div>` }),
+      choiceQ({ err: 'general', title: 'Kurz überprüft', prompt: esc(g.check.q), options: g.check.o.map((x, i) => ({ h: /[ぁ-ん一-龥]/.test(x) && x.length < 12 ? `<span class="jp">${esc(x)}</span>` : esc(x), ok: i === g.check.a })) })];
+  });
   add('Zuordnen', '🔗', () => [matchQ({ prompt: 'Ordne die Wörter ihrer Bedeutung zu.', pairs: T(5).map(id => { const it = Items[id]; return { a: `<span class="jp">${wordHtml(it)}</span>`, b: esc(it.de), id, say: it.kana }; }) })]);
   add('Japanisch → Deutsch', '🇩🇪', () => T(4).map(id => itemQ(id, 'mc')));
   add('Deutsch → Japanisch', '🇯🇵', () => T(4).map(id => itemQ(id, 'mcr')));
@@ -164,22 +175,21 @@ function contentSlots(l) {
       options: [it, ...ds].map(x => ({ h: esc(withRo ? romaOf(x.kana) : x.de), ok: x === it, id: x.id })), explain: `${esc(it.kana)} = ${esc(it.de)}` });
   }));
   add('Kanji-Bausteine', '漢', () => {
-    let ids = kanjiIds.length ? kanjiIds : [];
     const qs = [];
-    if (ids.length) {
-      qs.push(infoQ({ title: 'Kanji dieser Lektion', html: `<div class="card"><h3>Neue Kanji</h3><div class="kanji-list">${ids.map(id => { const k = Items[id]; return `<div class="kj"><div class="kj-c">${esc(k.c)}</div><div><b>${esc(k.de)}</b><div class="muted">On: ${esc(k.on)}${k.kun ? ' · Kun: ' + esc(k.kun) : ''}</div>${k.hint ? `<div class="muted">💡 ${esc(k.hint)}</div>` : ''}<div class="muted">${k.words.map(w => `<span class="jp">${esc(w[0])}</span> (${esc(w[1])}) ${esc(w[2])}`).join(' · ')}</div></div></div>`; }).join('')}</div></div>` }));
-      const tk = taker(ids);
+    if (kanjiIds.length) {
+      const tk = taker(kanjiIds);
       tk(2).forEach(id => qs.push(itemQ(id, 'read')));
       /* Komposita-Bedeutung aus den Teilen */
-      const comps = ids.flatMap(id => Items[id].words).filter(w => [...w[0]].length >= 2 && [...w[0]].every(c => KANJI[c] || /[ぁ-ん]/.test(c)) && [...w[0]].some(c => KANJI[c]));
+      const comps = kanjiIds.flatMap(id => Items[id].words).filter(w => [...w[0]].length >= 2 && [...w[0]].every(c => KANJI[c] || /[ぁ-ん]/.test(c)) && [...w[0]].some(c => KANJI[c]));
       const wc = shuffle(comps).slice(0, 1)[0];
       if (wc) qs.push(choiceQ({ err: 'kanji', title: 'Zusammengesetztes Kanji-Wort', prompt: `<div class="big-jp">${esc(wc[0])}</div><div class="muted center">${[...wc[0]].filter(c => KANJI[c]).map(c => `${esc(c)} = ${esc(KANJI[c].de)}`).join(' + ')}<br>Wie liest man es?</div>`, audio: wc[1], autoplay: false,
         options: [wc, ...shuffle(Object.values(KANJI).flatMap(x => x.words).filter(x => x[1] !== wc[1])).slice(0, 3)].map(x => ({ h: `<span class="jp">${esc(x[1])}</span>`, ok: x === wc })), explain: `${esc(wc[0])} = ${esc(wc[1])}: ${esc(wc[2])}` }));
       tk(1).forEach(id => qs.push(itemQ(id, 'mc')));
     } else {
-      const known = Object.values(Items).filter(x => x.kind === 'kanji').sort((a, b) => (S.items[a.id] ? 1 : 0) - (S.items[b.id] ? 1 : 0)).slice(0, 2);
-      qs.push(infoQ({ title: 'Kanji-Vorschau', html: `<div class="card"><h3>Kanji-Vorschau</h3><p>Kanji (漢字) stehen für Wörter und Bedeutungen, Hiragana für Endungen und kleine Wörter. Jedes Zeichen hat meist zwei Lesungen: <b>On</b> (aus dem Chinesischen, in Komposita) und <b>Kun</b> (japanisch, allein stehend).</p><p>Ein kleiner Blick auf zwei Zeichen, die später vorkommen:</p>${known.map(k => `<div class="kj"><div class="kj-c">${esc(k.c)}</div><div><b>${esc(k.de)}</b><div class="muted">On: ${esc(k.on)}${k.kun ? ' · Kun: ' + esc(k.kun) : ''}</div>${k.hint ? `<div class="muted">💡 ${esc(k.hint)}</div>` : ''}</div></div>`).join('')}</div>` }));
-      known.forEach(k => qs.push(itemQ(k.id, 'read')));
+      /* keine neuen Kanji: nur bereits gelernte Kanji wiederholen, sonst Wörter-Mix */
+      const seen = Object.values(Items).filter(x => x.kind === 'kanji' && S.items[x.id] && !S.items[x.id].pending).map(x => x.id);
+      if (seen.length >= 2) taker(seen)(3).forEach(id => qs.push(itemQ(id, 'read')));
+      else T(3).forEach(id => qs.push(itemQ(id, 'mc')));
     }
     return qs;
   });
@@ -191,11 +201,6 @@ function contentSlots(l) {
   add('Satz ordnen', '🔀', () => {
     const pool = sents.filter(s => sentTokens(s).length >= 2);
     return taker(pool)(3).map(s => orderQ({ prompt: `Bilde den Satz: <b>${esc(s.de)}</b>`, tokens: sentTokens(s), answer: s.s }));
-  });
-  add('Grammatik', '📘', () => {
-    const g = l.grammar;
-    return [infoQ({ title: g.title, html: `<div class="card"><h3>${esc(g.title)}</h3>${g.body.map(b => `<p>${esc(b)}</p>`).join('')}<div class="examples">${g.ex.map(e => `<div class="ex"><span class="jp">${P.html(e[0], S.settings.furigana)}</span>${playBtn(P.reading(e[0]))}<div class="muted">${esc(e[1])}</div></div>`).join('')}</div></div>` }),
-      choiceQ({ err: 'general', title: 'Kurz überprüft', prompt: esc(g.check.q), options: g.check.o.map((x, i) => ({ h: /[ぁ-ん一-龥]/.test(x) && x.length < 12 ? `<span class="jp">${esc(x)}</span>` : esc(x), ok: i === g.check.a })) })];
   });
   add('Übersetzen', '✍️', () => taker(sents)(2).map(s => typeQ({ jp: true, err: 'translate', title: 'Übersetzen', prompt: `<div class="big-de">${esc(s.de)}</div><div class="muted center">Schreibe den Satz auf Japanisch in Kana. Das Partikel は kannst du als は oder わ schreiben.</div>`, answers: sentVariants(s), show: P.reading(s.s), placeholder: 'Satz tippen', explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })));
   add('Nachsprechen', '🎤', () => {
@@ -236,7 +241,7 @@ function kanaSlots(l) {
   const wordsT = taker(K.words.length ? K.words : [{ k: 'あい', de: 'Liebe' }]);
   const kPool = K.pool;
   add('Aufwärmen', '🔥', () => warmupQs(l, ctx));
-  add('Zeichen kennenlernen', '🆕', () => [infoQ({ title: 'Zeichen kennenlernen', html: `<div class="card"><h3>${esc(l.title)}</h3><p class="muted">Tippe auf ein Zeichen, um es zu hören.</p>${l.groups.map(g => { const G_ = ALL_GROUPS.find(x => x.id === g); return `<h4>${esc(G_.name)}</h4><div class="kgrid">${G_.chars.map(c => `<button class="kcell" data-say="${esc(c.ch)}"><span class="jp big">${esc(c.ch)}</span><small>${esc(c.ro)}</small></button>`).join('')}</div>`; }).join('')}</div>` })]);
+  add('Zeichen kennenlernen', '🆕', () => { curIds.forEach(id => { if (S.items[id]) delete S.items[id].pending; }); return [infoQ({ title: 'Zeichen kennenlernen', html: `<div class="card"><h3>${esc(l.title)}</h3><div class="tipbox">${l.tips.map(t => `<p>${esc(t)}</p>`).join('')}</div><p class="muted">Tippe auf ein Zeichen, um es zu hören.</p>${l.groups.map(g => { const G_ = ALL_GROUPS.find(x => x.id === g); return `<h4>${esc(G_.name)}</h4><div class="kgrid">${G_.chars.map(c => `<button class="kcell" data-say="${esc(c.ch)}"><span class="jp big">${esc(c.ch)}</span><small>${esc(c.ro)}</small></button>`).join('')}</div>`; }).join('')}</div>` })]; });
   add('Zuordnen', '🔗', () => [matchQ({ prompt: 'Ordne Zeichen und Lesung zu.', pairs: T(5).map(id => { const it = Items[id]; return { a: `<span class="jp big">${esc(it.ch)}</span>`, b: esc(it.ro), id, say: it.ch }; }) })]);
   add('Zeichen lesen', '👁️', () => T(5).map(id => itemQ(id, 'read', kPool)));
   add('Lesung → Zeichen', '🔤', () => T(4).map(id => { const it = Items[id]; const ds = kanaDists(it.ch, 3, kPool); return choiceQ({ id, mode: 'read', err: 'kana', title: 'Welches Zeichen?', prompt: `Welches Zeichen ist <b>${esc(it.ro)}</b>?`, grid: true, bigOpt: true, audio: it.ch, autoplay: false, options: [it, ...ds.map(c => Items['ka:' + c])].map(x => ({ h: `<span class="jp big">${esc(x.ch)}</span>`, ok: x === it, id: x.id })) }); }));
@@ -253,7 +258,7 @@ function kanaSlots(l) {
   });
   add('Eintippen', '✏️', () => T(4).map(id => itemQ(id, 'type', kPool)));
   add('Wort bauen', '🧱', () => { const ws = K.words.filter(w => splitKana(w.k).length >= 3 && splitKana(w.k).length <= 5); if (ws.length < 2) return T(3).map(id => itemQ(id, 'hear', kPool)); return taker(ws)(3).map(w => orderQ({ prompt: `Baue das Wort aus den Zeichen: <b>${esc(w.de)}</b>`, tokens: splitKana(w.k), answer: w.k })); });
-  add('Merkhilfen', '💡', () => [infoQ({ title: 'Merkhilfen', html: `<div class="card"><h3>Worauf du achten solltest</h3>${l.tips.map(t => `<p>${esc(t)}</p>`).join('')}</div>` }), ...T(1).map(id => itemQ(id, 'read', kPool))]);
+  add('Mix aus Lesen und Hören', '🔀', () => T(4).map((id, i) => itemQ(id, ['read', 'hear'][i % 2], kPool)));
   add('Lesung → Zeichen wählen', '⌨️', () => T(4).map(id => { const it = Items[id]; return typeQ({ jp: true, id, mode: 'type', err: 'kana', title: 'Zeichen schreiben', prompt: `Wähle das Zeichen für <b>${esc(it.ro)}</b>`, audio: it.ch, autoplay: false, answers: [it.ch], show: it.ch, explain: `${esc(it.ch)} = ${esc(it.ro)}` }); }));
   add('Nachsprechen', '🎤', () => { const ws = K.words.length ? wordsT(4) : []; const cs = (ws.length ? [] : T(2)).map(id => { const it = Items[id]; return speakQ({ id, html: `<span class="jp big">${esc(it.ch)}</span>`, say: it.ch, de: it.ro }); }); return [...cs, ...ws.map(w => speakQ({ title: 'Wort nachsprechen', html: `<span class="jp big">${esc(w.k)}</span>`, say: w.k, de: w.de }))]; });
   add('Ähnliche Laute', '🎧', () => {

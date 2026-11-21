@@ -191,9 +191,9 @@ function review(id, correct, mode, errType) {
   s.mastered = isMastered(id);
   Store.save();
 }
-const isDue = id => { const s = S.items[id]; return s && s.due <= NOW(); };
+const isDue = id => { const s = S.items[id]; return s && !s.pending && s.due <= NOW(); };
 const dueList = () => Object.keys(S.items).filter(id => Items[id] && isDue(id));
-const weakList = () => Object.keys(S.items).filter(id => Items[id] && S.items[id].lapses > 0 && !S.items[id].mastered)
+const weakList = () => Object.keys(S.items).filter(id => Items[id] && S.items[id].lapses > 0 && !S.items[id].mastered && !S.items[id].pending)
   .sort((a, b) => (S.items[b].lapses - S.items[b].reps * 0.3) - (S.items[a].lapses - S.items[a].reps * 0.3));
 function lessonItems(l) {
   if (l.type === 'kana') return l.groups.flatMap(g => (ALL_GROUPS.find(x => x.id === g) || { chars: [] }).chars.map(c => 'ka:' + c.ch));
@@ -240,6 +240,7 @@ const Voice = {
   speak(text, rate) {
     return new Promise(res => {
       if (!('speechSynthesis' in window)) { this.fail('Keine Sprachausgabe im Browser'); return res(false); }
+      if (!text) return res(false);
       const synth = speechSynthesis;
       this.stopListening();
       if (!this.list.length) this.loadVoices();

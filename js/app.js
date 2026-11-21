@@ -153,7 +153,7 @@ function startPlacement() {
   runQuestions(qs, { label: 'Einstufungstest', onResult: (ok, o) => { (ok ? rec.right : rec.wrong).push(o.id); } }, () => {
     RT.place = false; leavePlayer();
     rec.right.forEach(id => { const s = st(id); s.ok[MODES_BY_KIND[Items[id].kind][0]] = 2; s.reps = 2; s.ivl = 4; s.step = 2; s.due = NOW() + 4 * DAY; s.seen = 1; });
-    rec.wrong.forEach(id => { const s = st(id); s.due = NOW(); s.lapses = 1; s.seen = 1; });
+    rec.wrong.forEach(id => { const s = st(id); s.due = NOW(); s.lapses = 1; s.seen = 1; s.pending = true; /* erst nach der Einführung in der Lektion abfragen */ });
     S.placement = { date: dayKey(), hira: rec.right.filter(i => /^ka:[ぁ-ゖ]/.test(i)).length + '/' + hira.length, kata: rec.right.filter(i => /^ka:[ァ-ヶ]/.test(i)).length + '/' + kata.length, words: rec.right.filter(i => i.startsWith('w:')).length + '/' + words.length, kanji: rec.right.filter(i => i.startsWith('kj:')).length + '/' + kanji.length };
     S.onboarded = true;
     /* Empfehlung: erste Lektion im Pfad, die noch nicht sicher sitzt */

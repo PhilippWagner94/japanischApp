@@ -49,3 +49,6 @@ Neu in 1.1: Kana-Auswahl statt Tastatur beim Schreiben, natürlichere Verabschie
 
 ## Update 1.2: Ton
 Die Sprachausgabe probiert jetzt automatisch andere Stimmen, wenn die gewählte nicht antwortet, und zeigt eine Meldung statt Stille. Unter Mehr → Einstellungen → Ton-Diagnose kannst du eine Stimme auswählen und testen.
+
+## Update auf 1.3
+Alle Dateien des entpackten Ordners im GitHub-Repo ersetzen (neu: js/data-lessons3.js), einmal online öffnen, App komplett schließen und neu starten.

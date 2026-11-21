@@ -207,7 +207,7 @@ function carouselQ(o) {
         host.innerHTML = `<div class="muted center">${i + 1} / ${n}</div>${o.cards[i].html}
           <div class="row"><button class="btn ghost prev" ${i ? '' : 'disabled'}>Zurück</button><button class="btn primary nxt">${i === n - 1 ? 'Weiter' : 'Nächste'}</button></div>`;
         bindSay(host);
-        if (o.cards[i].say) setTimeout(() => Voice.speak(o.cards[i].say), 200);
+        const say = o.cards[i].say; if (say) setTimeout(() => { if (host.isConnected) Voice.speak(say); }, 200);
         if (o.cards[i].onrender) o.cards[i].onrender(host);
         $('.prev', host).onclick = () => { i--; draw(); };
         $('.nxt', host).onclick = () => { if (i === n - 1) api.finish(); else { i++; draw(); } };
