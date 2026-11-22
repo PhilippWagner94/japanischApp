@@ -52,3 +52,6 @@ Die Sprachausgabe probiert jetzt automatisch andere Stimmen, wenn die gewählte 
 
 ## Update auf 1.3
 Alle Dateien des entpackten Ordners im GitHub-Repo ersetzen (neu: js/data-lessons3.js), einmal online öffnen, App komplett schließen und neu starten.
+
+## Update auf 1.4
+Alle Dateien des Ordners im GitHub-Repo ersetzen (neu: js/data-lessons4.js), einmal online öffnen, App komplett schließen und neu starten.

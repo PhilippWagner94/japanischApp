@@ -72,6 +72,14 @@ const KANJI_DATA = [
   ['泊', 'übernachten', 'ハク', 'と(まる)', [['一泊', 'いっぱく', 'eine Nacht'], ['二泊', 'にはく', 'zwei Nächte']], ''],
   ['部', 'Teil; Abteilung', 'ブ', '', [['部屋', 'へや', 'Zimmer']], ''],
   ['屋', 'Haus; Laden', 'オク', 'や', [['部屋', 'へや', 'Zimmer'], ['本屋', 'ほんや', 'Buchladen']], ''],
+  ['病', 'Krankheit', 'ビョウ', 'や(む)', [['病院', 'びょういん', 'Krankenhaus'], ['病気', 'びょうき', 'Krankheit']], ''],
+  ['院', 'Anstalt, Institution', 'イン', '', [['病院', 'びょういん', 'Krankenhaus']], ''],
+  ['薬', 'Medizin', 'ヤク', 'くすり', [['薬', 'くすり', 'Medizin'], ['薬屋', 'くすりや', 'Apotheke']], ''],
+  ['父', 'Vater', 'フ', 'ちち', [['父', 'ちち', 'Vater (mein eigener)'], ['お父さん', 'おとうさん', 'Vater (anderer)']], ''],
+  ['母', 'Mutter', 'ボ', 'はは', [['母', 'はは', 'Mutter (meine eigene)'], ['お母さん', 'おかあさん', 'Mutter (andere)']], ''],
+  ['友', 'Freund', 'ユウ', 'とも', [['友達', 'ともだち', 'Freund(in)']], ''],
+  ['山', 'Berg', 'サン', 'やま', [['山', 'やま', 'Berg'], ['富士山', 'ふじさん', 'Fuji']], 'Form eines Berges mit drei Gipfeln'],
+  ['川', 'Fluss', 'セン', 'かわ', [['川', 'かわ', 'Fluss']], 'drei Linien: fließendes Wasser'],
 ];
 const KANJI = {};
 KANJI_DATA.forEach(k => { KANJI[k[0]] = { c: k[0], de: k[1], on: k[2], kun: k[3], words: k[4], hint: k[5] }; });

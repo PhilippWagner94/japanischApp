@@ -88,3 +88,7 @@ Jede Frage `{title, id?, mode?, render(host, api)}`; `api.result(ok, {id, mode, 
 - js/data-lessons3.js: c11 Adjektive, c12 Vergangenheit, c13 Datum/Wochentage, c14 て-Form-Bitten, c15 Wünsche (たい/ほしい/すき), c16 Hotel. UNITS u5 (c11-c13), u6 (c14-c16). LESSON_BY_ID wird dort ergänzt. Script nach data-lessons2.js in index.html, in sw.js FILES, VERSION jp-app-v4.
 - Tests: validate.js (22 Lektionen), audit2.js (keine unbekannten Wörter), bot.js (alle 22 Lektionen ohne Fehler).
 - Roadmap: Gründe (から), Höflichkeit, Zählwörter, Konbini, Notfall/Gesundheit, Familie, Wetter, Smalltalk, mehr Kanji, KI-Gespräche (zuletzt).
+
+## Update v1.4
+- js/data-lessons4.js: c17 Gründe (から), c18 Zählwörter, c19 Notfall/Gesundheit (Kanji 病院薬), c20 Familie/Smalltalk (父母友), c21 Restaurant/Allergien, c22 Sehenswürdigkeiten (山川). UNITS u7 (c17-c19), u8 (c20-c22). Neue Kanji in data-kanji.js: 病 院 薬 父 母 友 山 川 (insgesamt 79). Script nach data-lessons3.js, in sw.js FILES, VERSION jp-app-v5. 28 Lektionen, 343 Wörter.
+- Tests: validate.js, audit2.js (jeweils data-lessons4 ergänzt), bot.js alle 28 Lektionen ohne Fehler.
