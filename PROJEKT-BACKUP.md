@@ -92,3 +92,9 @@ Jede Frage `{title, id?, mode?, render(host, api)}`; `api.result(ok, {id, mode, 
 ## Update v1.4
 - js/data-lessons4.js: c17 Gründe (から), c18 Zählwörter, c19 Notfall/Gesundheit (Kanji 病院薬), c20 Familie/Smalltalk (父母友), c21 Restaurant/Allergien, c22 Sehenswürdigkeiten (山川). UNITS u7 (c17-c19), u8 (c20-c22). Neue Kanji in data-kanji.js: 病 院 薬 父 母 友 山 川 (insgesamt 79). Script nach data-lessons3.js, in sw.js FILES, VERSION jp-app-v5. 28 Lektionen, 343 Wörter.
 - Tests: validate.js, audit2.js (jeweils data-lessons4 ergänzt), bot.js alle 28 Lektionen ohne Fehler.
+
+## Repository-Zugriff (Stand 2026-11-26)
+- GitHub-Repo: PhilippWagner94/japanischApp (Branch main), per GitHub Pages gehostet. Es ist im Claude-Projekt "Sprachlern App" als Quelle synchronisiert.
+- Nach dem Einbinden des Repos per add_repo (access push) in /home/claude/japanischapp klonen (git clone --depth 1). Der Inhalt entspricht dem Projektordner japanisch-app (Version 1.4, 28 Lektionen).
+- Updates: Dateien im Klon ersetzen, committen, mit `git push origin HEAD:main` hochladen. Wird der Push abgelehnt, fehlt die Schreibberechtigung der Claude-GitHub-App; dann ZIP per SendUserFile liefern.
+- Nach jedem Update: sw.js VERSION erhöhen (aktuell jp-app-v5), Nutzer: App online öffnen, komplett schließen, neu starten.
