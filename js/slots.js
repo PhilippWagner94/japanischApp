@@ -273,3 +273,75 @@ function kanaSlots(l) {
   slots.ctx = ctx;
   return slots;
 }
+
+/* ===== Stilles Training: 19 Übungen ganz ohne Ton (keine Ausgabe, keine Eingabe per Mikrofon) ===== */
+function silentPool() {
+  const learnedL = LESSONS.filter(l => (S.lessons[l.id] && S.lessons[l.id].done) || isSkipped(l.id));
+  const ids = new Set();
+  learnedL.forEach(l => lessonItems(l).forEach(id => { if (Items[id] && !(S.items[id] && S.items[id].pending)) ids.add(id); }));
+  Object.keys(S.items).forEach(id => { if (Items[id] && !S.items[id].pending) ids.add(id); });
+  const all = [...ids];
+  return { lessons: learnedL, ids: all, words: all.filter(i => i.startsWith('w:')), kana: all.filter(i => i.startsWith('ka:')), kanji: all.filter(i => i.startsWith('kj:')),
+    content: learnedL.filter(l => l.type === 'content'), sents: learnedL.filter(l => l.sents).flatMap(l => l.sents) };
+}
+function silentMode(id) {
+  const it = Items[id]; const modes = it.kind === 'kana' ? ['read', 'type'] : it.kind === 'word' ? ['mc', 'mcr', 'type'] : ['read', 'mc'];
+  const s = S.items[id] || { ok: {} }; let best = modes[0], bc = 1e9;
+  shuffle(modes).forEach(m => { const c = (s.ok && s.ok[m === 'mcr' ? 'mc' : m]) || 0; if (c < bc) { bc = c; best = m; } });
+  return best;
+}
+function silentSlots() {
+  const Pl = silentPool();
+  const ctx = { lessonIds: new Set(), missed: [] };
+  const anyIds = Pl.ids;
+  const TW = taker(Pl.words.length ? Pl.words : anyIds), TKa = taker(Pl.kana.length ? Pl.kana : anyIds), TKj = taker(Pl.kanji.length ? Pl.kanji : anyIds), TAny = taker(anyIds);
+  const slots = []; const add = (name, icon, build) => slots.push({ name, icon, build });
+  const wordQ = (id, m) => itemQ(id, Items[id].kind === 'word' ? m : silentMode(id));
+  const sents = Pl.sents.filter(s => sentTokens(s).length >= 2);
+  const sentDe = (s, n = 3) => shuffle(Pl.sents.filter(x => x.de !== s.de)).slice(0, n);
+  const mix = n => TAny(n).map(id => itemQ(id, silentMode(id)));
+  const readWord = id => { const it = Items[id]; const ds = wordDists(it); const withRo = S.settings.romajiHelp;
+    return choiceQ({ id, mode: 'mc', err: 'read', title: 'Lesen', prompt: `<div class="big-jp">${wordHtml(it, true).replace(/<rt>.*?<\/rt>/g, '')}</div><div class="muted center">${withRo ? 'Wie liest man das?' : 'Was bedeutet das?'}</div>`,
+      options: [it, ...ds].map(x => ({ h: esc(withRo ? romaOf(x.kana) : x.de), ok: x === it, id: x.id })), explain: `${esc(it.kana)} = ${esc(it.de)}` }); };
+
+  add('Aufwärmen', '🔥', () => {
+    const due = shuffle(dueList().filter(id => anyIds.includes(id))).slice(0, 5);
+    const rest = due.length < 5 ? weakList().filter(id => !due.includes(id)).slice(0, 5 - due.length) : [];
+    const ids = [...due, ...rest]; const list = ids.length ? ids : TAny(4);
+    return [infoQ({ title: 'Stilles Training', html: `<div class="card"><h3>🔇 Stilles Training</h3><p>Diese Einheit kommt komplett ohne Ton aus: nichts wird vorgelesen, nichts musst du sprechen. Perfekt für Bahn, Büro oder Bett.</p><p class="muted">Geübt wird nur, was du schon gelernt hast.</p></div>` }), ...list.map(id => itemQ(id, silentMode(id)))];
+  });
+  add('Zuordnen', '🔗', () => {
+    if (Pl.words.length >= 4) return [matchQ({ prompt: 'Ordne die Wörter ihrer Bedeutung zu.', pairs: TW(5).map(id => { const it = Items[id]; return { a: `<span class="jp">${wordHtml(it)}</span>`, b: esc(it.de), id }; }) })];
+    return [matchQ({ prompt: 'Ordne Zeichen und Lesung zu.', pairs: TKa(5).map(id => { const it = Items[id]; return { a: `<span class="jp big">${esc(it.ch)}</span>`, b: esc(it.ro), id }; }) })];
+  });
+  add('Japanisch → Deutsch', '🇩🇪', () => TW(4).map(id => wordQ(id, 'mc')));
+  add('Deutsch → Japanisch', '🇯🇵', () => TW(4).map(id => wordQ(id, 'mcr')));
+  add('Lesen üben', '📖', () => TW(4).map(id => Items[id].kind === 'word' ? readWord(id) : itemQ(id, silentMode(id))));
+  add('Wörter tippen', '⌨️', () => TW(3).map(id => wordQ(id, 'type')));
+  add('Zeichen lesen', '👁️', () => (Pl.kana.length ? TKa(4).map(id => itemQ(id, 'read')) : mix(4)));
+  add('Zeichen tippen', '✏️', () => (Pl.kana.length ? TKa(3).map(id => itemQ(id, 'type')) : mix(3)));
+  add('Kanji erkennen', '漢', () => (Pl.kanji.length ? TKj(3).map(id => itemQ(id, 'read')) : mix(3)));
+  add('Kanji-Wörter lesen', '🈴', () => (Pl.kanji.length ? TKj(3).map(id => itemQ(id, 'mc')) : mix(3)));
+  add('Lückentext: Partikel', '🧩', () => { const q = partQuestions(Pl.sents, 3); return q.length ? q : mix(3); });
+  add('Satz ordnen', '🔀', () => (sents.length ? taker(sents)(3).map(s => orderQ({ prompt: `Bilde den Satz: <b>${esc(s.de)}</b>`, tokens: sentTokens(s), answer: s.s })) : mix(3)));
+  add('Satz verstehen', '🧠', () => (Pl.sents.length >= 4 ? taker(Pl.sents)(3).map(s => choiceQ({ err: 'read', title: 'Satz verstehen', prompt: `<div class="big-jp">${P.html(s.s, S.settings.furigana)}</div><div class="muted center">Was bedeutet der Satz?</div>`,
+    options: [s, ...sentDe(s)].map(x => ({ h: esc(x.de), ok: x === s })), explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })) : mix(3)));
+  add('Deutsch → Satz', '🔁', () => (Pl.sents.length >= 4 ? taker(Pl.sents)(3).map(s => choiceQ({ err: 'translate', title: 'Welcher Satz passt?', prompt: `<div class="big-de">${esc(s.de)}</div>`,
+    options: [s, ...sentDe(s)].map(x => ({ h: `<span class="jp">${P.html(x.s, S.settings.furigana)}</span>`, ok: x === s })), explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })) : mix(3)));
+  add('Übersetzen', '✍️', () => (sents.length ? taker(sents)(2).map(s => typeQ({ jp: true, err: 'translate', title: 'Übersetzen', prompt: `<div class="big-de">${esc(s.de)}</div><div class="muted center">Schreibe den Satz auf Japanisch in Kana. Das Partikel は kannst du als は oder わ schreiben.</div>`, answers: sentVariants(s), show: P.reading(s.s), placeholder: 'Satz tippen', explain: `<span class="jp">${P.html(s.s, S.settings.furigana)}</span>` })) : mix(2)));
+  add('Lesetext', '📰', () => {
+    if (!Pl.content.length) return mix(3);
+    const l = Pl.content[rnd(Pl.content.length)]; const r = l.reading;
+    return [infoQ({ title: 'Lesetext', html: `<div class="card"><h3>${esc(l.title)}: Lies den Text</h3><div class="readtext">${r.lines.map(x => `<div class="jp">${P.html(x, S.settings.furigana)}</div>`).join('')}</div><details><summary>Übersetzung zeigen</summary><p>${esc(r.de)}</p></details></div>` }),
+      ...r.q.map(q => choiceQ({ err: 'read', title: 'Verständnis', prompt: esc(q.q), options: q.o.map((x, i) => ({ h: esc(x), ok: i === q.a })) }))];
+  });
+  add('Rollenspiel', '💬', () => (Pl.content.length ? [dialogQ(Pl.content[rnd(Pl.content.length)].dialog)] : mix(3)));
+  add('Schnellrunde', '⚡', () => mix(6));
+  add('Fehler wiederholen', '🎯', () => {
+    const ids = uniq(ctx.missed).slice(0, 6);
+    if (!ids.length) return mix(3);
+    return [infoQ({ title: 'Fehler-Wiederholung', html: `<div class="card"><h3>Noch einmal die schwierigen</h3><p>Du hast ${ids.length} Element(e) verpasst. Sie kommen jetzt in anderer Form noch einmal.</p></div>` }), ...ids.map(id => itemQ(id, silentMode(id)))];
+  });
+  slots.ctx = ctx; slots.pool = Pl;
+  return slots;
+}

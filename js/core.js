@@ -192,6 +192,7 @@ function review(id, correct, mode, errType) {
   Store.save();
 }
 const isDue = id => { const s = S.items[id]; return s && !s.pending && s.due <= NOW(); };
+let SILENT = false; /* Stilles Training: keine Ton-Ausgabe, kein Mikrofon */
 const dueList = () => Object.keys(S.items).filter(id => Items[id] && isDue(id));
 const weakList = () => Object.keys(S.items).filter(id => Items[id] && S.items[id].lapses > 0 && !S.items[id].mastered && !S.items[id].pending)
   .sort((a, b) => (S.items[b].lapses - S.items[b].reps * 0.3) - (S.items[a].lapses - S.items[a].reps * 0.3));
@@ -230,7 +231,7 @@ const Voice = {
     if (!('speechSynthesis' in window)) { this.lastError = 'Dieser Browser hat keine Sprachausgabe.'; return; }
     this.loadVoices(); speechSynthesis.onvoiceschanged = () => this.loadVoices();
     /* Audio beim ersten Antippen „entsperren“ (nötig auf manchen Android/iOS-Geräten) */
-    const unlock = () => { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'ja-JP'; speechSynthesis.speak(u); } catch (e) { /* ignorieren */ } };
+    const unlock = () => { if (SILENT) return; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'ja-JP'; speechSynthesis.speak(u); } catch (e) { /* ignorieren */ } };
     document.addEventListener('pointerdown', unlock, { once: true });
   },
   fail(msg) {
@@ -239,6 +240,7 @@ const Voice = {
   },
   speak(text, rate) {
     return new Promise(res => {
+      if (typeof SILENT !== 'undefined' && SILENT) return res(false);
       if (!('speechSynthesis' in window)) { this.fail('Keine Sprachausgabe im Browser'); return res(false); }
       if (!text) return res(false);
       const synth = speechSynthesis;

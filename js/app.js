@@ -32,7 +32,7 @@ function playerShell(title) {
     <div class="ptitle"></div><div class="qhost"></div><div class="pfoot"></div></div>`;
   $('#nav').style.display = 'none';
 }
-function leavePlayer() { $('#nav').style.display = ''; Voice.stopListening(); try { speechSynthesis.cancel(); } catch (e) { /* ignorieren */ } }
+function leavePlayer() { SILENT = false; document.body.classList.remove('silent'); $('#nav').style.display = ''; Voice.stopListening(); try { speechSynthesis.cancel(); } catch (e) { /* ignorieren */ } }
 
 /* Führt eine Liste Fragen nacheinander aus. cb(stats) am Ende. */
 function runQuestions(qs, opt, cb) {
@@ -112,6 +112,34 @@ function finishLesson(l, rec) {
   $('[data-a=home]').onclick = () => go('path');
   const n = $('[data-a=next]'); if (n) n.onclick = () => startLesson(nl.id);
   const a = $('[data-a=again]'); if (a) a.onclick = () => startLesson(l.id, 0);
+}
+
+/* ---------- Stilles Training (ohne Ton, ohne Mikrofon) ---------- */
+function startSilent() {
+  const slots = silentSlots();
+  if (slots.pool.ids.length < 4) { toast('Schließe zuerst eine Lektion ab, dann gibt es etwas zu üben.'); return; }
+  SILENT = true; document.body.classList.add('silent'); try { speechSynthesis.cancel(); } catch (e) { /* ignorieren */ }
+  const rec = recorder(slots.ctx); let si = 0;
+  playerShell('🔇 Stilles Training');
+  bindX(() => go('today'));
+  const runSlot = () => {
+    if (si >= slots.length) return finishSilent(rec);
+    const s = slots[si];
+    $('.pbar i').style.width = pct(si / slots.length) + '%'; $('.pcount').textContent = `${si + 1}/${slots.length}`;
+    let qs; try { qs = s.build().filter(Boolean); } catch (e) { console.error(e); qs = []; }
+    if (!qs.length) { si++; return runSlot(); }
+    runQuestions(qs, { label: `${s.icon} ${s.name}`, onResult: rec.onResult }, () => { si++; runSlot(); });
+  };
+  runSlot();
+}
+function finishSilent(rec) {
+  leavePlayer();
+  const acc = rec.total ? rec.ok / rec.total : 1;
+  view().innerHTML = `<div class="done"><div class="trophy">🔇✅</div><h2>Stilles Training geschafft</h2>
+    <p class="big">${rec.ok} von ${rec.total} richtig (${pct(acc)} %)</p>
+    <p class="muted">Deine Ergebnisse fließen in die Wiederholung ein. Punkte gibt es nur für Lektionen.</p>
+    <div class="stack"><button class="btn primary big" data-a="home">Fertig</button><button class="btn big" data-a="again">Noch eine Runde</button></div></div>`;
+  $('[data-a=home]').onclick = () => go('today'); $('[data-a=again]').onclick = startSilent;
 }
 
 /* ---------- Freie Übungs-Sitzungen ---------- */
@@ -224,6 +252,7 @@ function viewToday() {
       ${resume ? `<button class="card action" data-a="resume"><span class="ico">▶️</span><div><b>Lektion fortsetzen</b><small>${esc(resume.title)} · Übung ${S.resume.slot + 1}/19</small></div></button>` : ''}
       <button class="card action ${st_.due ? 'hot' : ''}" data-a="review"><span class="ico">🔁</span><div><b>Wiederholen</b><small>${st_.due ? st_.due + ' fällig' : 'Nichts fällig, gut gemacht'}</small></div></button>
       ${nl ? `<button class="card action" data-a="lesson"><span class="ico">${nl.icon}</span><div><b>Nächste Lektion</b><small>${esc(nl.title)}</small></div></button>` : `<div class="card">🎉 Alle Lektionen dieser Version geschafft. Weitere folgen.</div>`}
+      <button class="card action" data-a="silent"><span class="ico">🔇</span><div><b>Stilles Training</b><small>19 Übungen ganz ohne Ton und Mikrofon</small></div></button>
       <button class="card action" data-a="weak"><span class="ico">🎯</span><div><b>Schwächen üben</b><small>${weakList().length} Elemente brauchen Aufmerksamkeit</small></div></button>
       ${S.onboarded ? '' : `<button class="card action" data-a="place"><span class="ico">📊</span><div><b>Einstufungstest</b><small>2 Minuten, damit die App dein Niveau kennt</small></div></button>`}
     </div>
@@ -231,7 +260,7 @@ function viewToday() {
     <div class="grid3"><div class="stat"><b>${st_.w.mast}</b><small>Wörter gemeistert</small></div><div class="stat"><b>${st_.ka.mast}</b><small>Kana gemeistert</small></div><div class="stat"><b>${st_.k.mast}</b><small>Kanji gemeistert</small></div></div>
     ${weakTypes.length ? `<h3>Häufigste Fehler</h3><div class="card">${weakTypes.map(([k, v]) => `<div class="kv"><span>${esc(ERR_LABEL[k] || k)}</span><b>${v}</b></div>`).join('')}</div>` : ''}
     <p class="muted center small">Die erste Lektion dauert etwa 12–15 Minuten. Kurze Sitzungen jeden Tag bringen mehr als lange am Wochenende.</p>`;
-  $$('[data-a]').forEach(b => b.onclick = () => ({ review: reviewSession, weak: weakSession, place: startPlacement, lesson: () => startLesson(nl.id), resume: () => startLesson(S.resume.id) })[b.dataset.a]());
+  $$('[data-a]').forEach(b => b.onclick = () => ({ review: reviewSession, weak: weakSession, silent: startSilent, place: startPlacement, lesson: () => startLesson(nl.id), resume: () => startLesson(S.resume.id) })[b.dataset.a]());
 }
 
 function viewPath() {

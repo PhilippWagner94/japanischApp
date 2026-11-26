@@ -98,3 +98,8 @@ Jede Frage `{title, id?, mode?, render(host, api)}`; `api.result(ok, {id, mode, 
 - Nach dem Einbinden des Repos per add_repo (access push) in /home/claude/japanischapp klonen (git clone --depth 1). Der Inhalt entspricht dem Projektordner japanisch-app (Version 1.4, 28 Lektionen).
 - Updates: Dateien im Klon ersetzen, committen, mit `git push origin HEAD:main` hochladen. Wird der Push abgelehnt, fehlt die Schreibberechtigung der Claude-GitHub-App; dann ZIP per SendUserFile liefern.
 - Nach jedem Update: sw.js VERSION erhöhen (aktuell jp-app-v5), Nutzer: App online öffnen, komplett schließen, neu starten.
+
+## Update v1.5: Stilles Training
+- Startseite: Karte "🔇 Stilles Training" (data-a=silent → startSilent in app.js). 19 Übungen wie eine Lektion, aber komplett ohne Ton: globales `let SILENT` (core.js), Voice.speak kehrt bei SILENT sofort zurück, Audio-Unlock übersprungen, CSS `body.silent .play{display:none}`, kein speakQ/Mikrofon, keine Hör-Modi.
+- slots.js: silentPool() (Items aus abgeschlossenen/übersprungenen Lektionen + gestartete Items), silentMode(id) (kana read/type, word mc/mcr/type, kanji read/mc), silentSlots() mit 19 Übungen (Aufwärmen, Zuordnen, JA→DE, DE→JA, Lesen, Wörter tippen, Zeichen lesen/tippen, Kanji erkennen/-Wörter, Partikel, Satz ordnen, Satz verstehen, Deutsch→Satz, Übersetzen, Lesetext, Rollenspiel, Schnellrunde, Fehler wiederholen). Fallback auf Mix, falls Inhalte fehlen. Keine Punkte, aber SRS-Ergebnisse zählen. leavePlayer setzt SILENT zurück.
+- Test: scratchpad silent.js (3 Szenarien, 0 Ton-/Mikro-Aufrufe). SW VERSION jp-app-v6.
