@@ -306,12 +306,15 @@ function viewDeck(d) {
 
 function viewKanji() {
   if (SUB && SUB.kanji) return viewKanjiDetail(SUB.kanji);
+  if (SUB && SUB.werk) return viewWerk();
   const ks = Object.values(Items).filter(i => i.kind === 'kanji'); const ds = deckStats(i => i.kind === 'kanji');
   view().innerHTML = `<h1>Kanji</h1><p class="muted">${ds.mast} von ${ds.total} gemeistert · Fokus: Lesen und Verstehen. Tippe ein Zeichen für Bedeutung, Lesungen und Wörter.</p>
-    <div class="stack"><button class="btn primary big" data-a="train">Kanji üben</button></div>
+    <div class="stack"><button class="btn primary big" data-a="train">Kanji üben</button>
+    <button class="card action" data-a="werk"><span class="ico">🔨</span><div><b>Kanji-Werkstatt</b><small>Bilder und Bausteine: so entstehen Kanji (${kwDone()} von ${KW_PICS.length + KW_FAMS.length} geschafft)</small></div></button></div>
     <div class="kgrid big">${ks.map(k => `<button class="kcell ${S.items[k.id] && S.items[k.id].mastered ? 'mast' : S.items[k.id] ? 'seen' : ''}" data-k="${esc(k.c)}"><span class="jp big">${esc(k.c)}</span><small>${esc(k.de)}</small></button>`).join('')}</div>
     <div class="card"><h3>So funktionieren Kanji</h3><p>Ein Kanji hat meist zwei Lesungen: <b>On</b> (chinesischer Ursprung, meist in Wörtern aus mehreren Zeichen: 電車 = でんしゃ) und <b>Kun</b> (japanisch, oft allein mit Hiragana-Endung: 食べる = たべる).</p><p>Zusammengesetzte Wörter ergeben sich aus den Teilen: 電 (Strom) + 車 (Wagen) = 電車 (Zug). 東 (Osten) + 京 (Hauptstadt) = 東京 (Tokio).</p></div>`;
   $('[data-a=train]').onclick = () => deckSession(i => i.kind === 'kanji', 'Kanji');
+  $('[data-a=werk]').onclick = () => { SUB = { werk: 1 }; viewKanji(); };
   $$('[data-k]').forEach(b => b.onclick = () => { SUB = { kanji: b.dataset.k }; viewKanji(); });
 }
 function viewKanjiDetail(c) {
@@ -322,6 +325,44 @@ function viewKanjiDetail(c) {
     <div class="stack"><button class="btn primary big" data-a="t">Dieses Kanji üben</button></div>`;
   bindSay(view()); $('[data-a=back]').onclick = () => { SUB = null; viewKanji(); };
   $('[data-a=t]').onclick = () => startSession('Kanji ' + k.c, [k.id, k.id, k.id], { max: 3 });
+}
+
+
+/* ---------- Kanji-Werkstatt ---------- */
+const kwDone = () => Object.values(S.kw || {}).filter(x => x.done).length;
+function viewWerk() {
+  S.kw = S.kw || {};
+  const row = (id, icon, title, sub) => { const r = S.kw[id]; return `<button class="card action" data-w="${id}"><span class="ico">${icon}</span><div><b>${esc(title)}</b><small>${esc(sub)}${r && r.done ? ` · ✅ ${pct(r.acc)} %` : ''}</small></div></button>`; };
+  view().innerHTML = `<div class="back"><button class="btn ghost" data-a="back">‹ Zurück</button></div><h1>🔨 Kanji-Werkstatt</h1>
+    <p class="muted">Kanji sind keine Zufallszeichen: Viele sind kleine Bilder, und die meisten bestehen aus Bausteinen. Der Hauptbaustein (Radikal) verrät die Kategorie, der Rest unterscheidet die Bedeutung. Ganz ohne Ton, rein visuell.</p>
+    <h3>Bildkanji</h3><div class="stack">${KW_PICS.map(g => row(g.id, g.icon, g.title, g.items.map(i => i[0]).join(' '))).join('')}</div>
+    <h3>Bausteine und ihre Familien</h3><div class="stack">${KW_FAMS.map(f => row(f.id, f.pic, `${f.r} ${f.name}`, f.members.slice(0, 5).map(m => m[0]).join(' '))).join('')}</div>`;
+  $('[data-a=back]').onclick = () => { SUB = null; viewKanji(); };
+  $$('[data-w]').forEach(b => b.onclick = () => startWerk(b.dataset.w));
+}
+function startWerk(id) {
+  const g = KW_PICS.find(x => x.id === id), f = KW_FAMS.find(x => x.id === id);
+  const slots = g ? kwPicSlots(g) : kwFamSlots(f); const rec = recorder(slots.ctx); let si = 0;
+  const title = g ? g.title : `${f.r} ${f.name}`;
+  playerShell('🔨 ' + title);
+  bindX(() => { SUB = { werk: 1 }; go('kanji'); });
+  const runSlot = () => {
+    if (si >= slots.length) return finishWerk(id, title, rec);
+    const s = slots[si];
+    $('.pbar i').style.width = pct(si / slots.length) + '%'; $('.pcount').textContent = `${si + 1}/${slots.length}`;
+    let qs; try { qs = s.build().filter(Boolean); } catch (e) { console.error(e); qs = []; }
+    if (!qs.length) { si++; return runSlot(); }
+    runQuestions(qs, { label: `${s.icon} ${s.name}`, onResult: rec.onResult }, () => { si++; runSlot(); });
+  };
+  runSlot();
+}
+function finishWerk(id, title, rec) {
+  leavePlayer(); S.kw = S.kw || {};
+  const acc = rec.total ? rec.ok / rec.total : 1; const passed = acc * 100 >= S.settings.minAcc; const prev = S.kw[id] || {};
+  S.kw[id] = { done: prev.done || passed, acc: Math.max(prev.acc || 0, acc), tries: (prev.tries || 0) + 1 }; Store.save();
+  view().innerHTML = `<div class="done"><div class="trophy">${passed ? '🔨' : '💪'}</div><h2>${passed ? 'Geschafft!' : 'Fast geschafft'}</h2><p class="big">${esc(title)}: ${rec.ok} von ${rec.total} richtig (${pct(acc)} %)</p>
+    <div class="stack"><button class="btn primary big" data-a="home">Zur Werkstatt</button><button class="btn big" data-a="again">Nochmal</button></div></div>`;
+  $('[data-a=home]').onclick = () => { SUB = { werk: 1 }; go('kanji'); }; $('[data-a=again]').onclick = () => startWerk(id);
 }
 
 /* Mehr: Menü */

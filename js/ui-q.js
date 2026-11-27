@@ -246,3 +246,45 @@ function dialogQ(o) {
     },
   };
 }
+
+/* Antippen und entdecken: Bild verwandelt sich in das Zeichen */
+function revealQ(o) {
+  return {
+    title: o.title, noScore: true,
+    render(host, api) {
+      host.innerHTML = `<div class="reveal"><button class="rv-box" aria-label="Antippen und entdecken"><div class="rv-pic">${o.pic}</div><div class="rv-kj jp">${esc(o.kanji)}</div></button>
+        <div class="rv-hint">Antippen und entdecken!</div><div class="rv-text"></div></div>`;
+      const box = $('.rv-box', host);
+      box.onclick = () => {
+        if (box.classList.contains('open')) return;
+        box.classList.add('open'); $('.rv-hint', host).textContent = ''; $('.rv-text', host).innerHTML = o.text; api.proceed('Weiter');
+      };
+    },
+  };
+}
+
+/* Mehrfachauswahl: genau n richtige Optionen wählen */
+function multiQ(o) {
+  return {
+    title: o.title, id: o.id, mode: o.mode,
+    render(host, api) {
+      const opts = shuffle(o.options);
+      host.innerHTML = `<div class="prompt">${o.prompt || ''}</div>
+        <div class="opts grid multi bigopt">${opts.map((x, i) => `<button class="opt" data-i="${i}">${x.h}</button>`).join('')}</div>
+        <div class="row"><button class="btn primary check" disabled>Prüfen</button></div>`;
+      const sel = new Set(); const chk = $('.check', host);
+      $$('.opt', host).forEach(b => b.onclick = () => {
+        if (host.dataset.done) return; const i = +b.dataset.i;
+        if (sel.has(i)) { sel.delete(i); b.classList.remove('sel'); } else if (sel.size < o.n) { sel.add(i); b.classList.add('sel'); }
+        chk.disabled = sel.size !== o.n;
+      });
+      chk.onclick = () => {
+        if (host.dataset.done || sel.size !== o.n) return; host.dataset.done = 1;
+        let ok = true;
+        $$('.opt', host).forEach((b, j) => { b.disabled = true; b.classList.remove('sel'); if (opts[j].ok) b.classList.add('right'); else if (sel.has(j)) { b.classList.add('wrong'); } if (opts[j].ok !== sel.has(j)) ok = false; });
+        chk.remove();
+        api.result(ok, { id: o.id, mode: o.mode, err: o.err, msg: ok ? (o.explain || '') : `Richtig wären: ${opts.filter(x => x.ok).map(x => x.h).join(' ')}${o.explain ? '<br>' + o.explain : ''}` });
+      };
+    },
+  };
+}

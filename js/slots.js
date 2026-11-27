@@ -345,3 +345,70 @@ function silentSlots() {
   slots.ctx = ctx; slots.pool = Pl;
   return slots;
 }
+
+/* ===== Kanji-Werkstatt ===== */
+const kwId = c => (Items['kj:' + c] ? 'kj:' + c : undefined);
+const kwJ = c => `<span class="jp big">${esc(c)}</span>`;
+function kwOthers(list, ok, key, n = 3) { const seen = new Set([ok[key]]); const out = []; for (const x of shuffle(list)) { if (!seen.has(x[key]) && x.c !== ok.c) { out.push(x); seen.add(x[key]); } if (out.length >= n) break; } return out; }
+
+function kwPicSlots(g) {
+  const items = g.items.map(a => ({ c: a[0], pic: a[1], de: a[2], story: a[3], read: a[4] }));
+  const ctx = { missed: [] }; const T = taker(items);
+  const slots = []; const add = (name, icon, build) => slots.push({ name, icon, build });
+  const k2de = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Kanji erkennen', prompt: `<div class="big-jp">${esc(it.c)}</div><div class="muted center">Was bedeutet dieses Kanji?</div>`,
+    options: [it, ...kwOthers(items, it, 'de')].map(x => ({ h: esc(x.de), ok: x === it })), explain: `${esc(it.c)} = ${esc(it.de)} (${esc(it.read)})` });
+  const de2k = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Welches Kanji?', prompt: `<div class="big-de">${esc(it.de)}</div>`, grid: true, bigOpt: true,
+    options: [it, ...kwOthers(items, it, 'c')].map(x => ({ h: kwJ(x.c), ok: x === it })), explain: `${esc(it.c)} = ${esc(it.de)}` });
+  const pic2k = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Bild → Kanji', prompt: `<div class="rv-pic small">${it.pic}</div><div class="muted center">Welches Kanji ist aus diesem Bild entstanden?</div>`, grid: true, bigOpt: true,
+    options: [it, ...kwOthers(items, it, 'c')].map(x => ({ h: kwJ(x.c), ok: x === it })), explain: `${esc(it.c)}: ${esc(it.story)}` });
+  const story = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Welche Geschichte?', prompt: `<div class="big-jp">${esc(it.c)}</div><div class="muted center">Was hat sich der Erfinder dabei gedacht?</div>`,
+    options: [it, ...kwOthers(items, it, 'story')].map(x => ({ h: esc(x.story), ok: x === it })), explain: `${esc(it.c)} = ${esc(it.de)}` });
+  const rd = it => choiceQ({ id: kwId(it.c), mode: 'mc', err: 'kanji', title: 'Lesungen', prompt: `<div class="big-jp">${esc(it.c)}</div><div class="muted center">Wie liest man dieses Kanji (${esc(it.de)})?</div>`,
+    options: [it, ...kwOthers(items, it, 'read')].map(x => ({ h: `<span class="jp">${esc(x.read)}</span>`, ok: x === it })), explain: `${esc(it.c)} = ${esc(it.read)}` });
+  add('Entdecken', '🔍', () => items.map(it => revealQ({ title: 'Bild entdecken', pic: it.pic, kanji: it.c,
+    text: `<div class="card center"><div class="giant jp">${esc(it.c)}</div><h3>${esc(it.de)}</h3><p class="muted">Lesung: <span class="jp">${esc(it.read)}</span></p><p>${esc(it.story)}</p></div>` })));
+  add('Bild → Kanji', '🖼️', () => T(4).map(pic2k));
+  add('Kanji → Bedeutung', '🇩🇪', () => T(4).map(k2de));
+  add('Zuordnen', '🔗', () => [matchQ({ prompt: 'Ordne Bild und Kanji zu.', pairs: shuffle(items).slice(0, 6).map(it => ({ a: `<span class="emo">${it.pic}</span>`, b: `<span class="jp big">${esc(it.c)}</span>`, id: kwId(it.c) })) })]);
+  add('Bedeutung → Kanji', '🔤', () => T(4).map(de2k));
+  add('Geschichten', '📖', () => T(3).map(story));
+  add('Lesungen', '🔊', () => T(3).map(rd));
+  add('Schnellrunde', '⚡', () => T(6).map((it, i) => [k2de, de2k, pic2k][i % 3](it)));
+  add('Fehler wiederholen', '🎯', () => { const ids = uniq(ctx.missed).slice(0, 4); const its = ids.map(id => items.find(x => kwId(x.c) === id)).filter(Boolean); return (its.length ? its : T(3)).map(k2de); });
+  slots.ctx = ctx; return slots;
+}
+
+function kwFamSlots(f) {
+  const mem = f.members.map(m => ({ c: m[0], de: m[1], read: m[2] })); const ctx = { missed: [] }; const T = taker(mem);
+  const slots = []; const add = (name, icon, build) => slots.push({ name, icon, build });
+  const allMem = Object.values(KWM).map(m => ({ c: m.c, de: m.de, read: m.read }));
+  const pad = (it, key) => { const pool = [...mem, ...allMem]; return kwOthers(pool, it, key); };
+  const k2de = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Kanji → Bedeutung', prompt: `<div class="big-jp">${esc(it.c)}</div><div class="muted center">Was bedeutet dieses Kanji? Hinweis: Baustein <b class="jp">${esc(f.r)}</b> = ${esc(f.name)}</div>`,
+    options: [it, ...kwOthers(mem, it, 'de').concat(pad(it, 'de')).filter((x, i, a) => a.findIndex(y => y.de === x.de) === i).slice(0, 3)].map(x => ({ h: esc(x.de), ok: x === it })), explain: `${esc(it.c)} = ${esc(it.de)} (${esc(it.read)})` });
+  const de2k = it => choiceQ({ id: kwId(it.c), mode: 'read', err: 'kanji', title: 'Bedeutung → Kanji', prompt: `<div class="big-de">${esc(it.de)}</div><div class="muted center">Baustein <b class="jp">${esc(f.r)}</b> (${esc(f.name)}) gehört dazu.</div>`, grid: true, bigOpt: true,
+    options: [it, ...kwOthers(mem, it, 'c').slice(0, 3)].map(x => ({ h: kwJ(x.c), ok: x === it })), explain: `${esc(it.c)} = ${esc(it.de)}` });
+  const rd = it => choiceQ({ id: kwId(it.c), mode: 'mc', err: 'kanji', title: 'Lesung wählen', prompt: `<div class="big-jp">${esc(it.c)}</div><div class="muted center">Wie liest man es (${esc(it.de)})?</div>`,
+    options: [it, ...kwOthers(mem, it, 'read').concat(pad(it, 'read')).filter((x, i, a) => a.findIndex(y => y.read === x.read) === i && x.read !== it.read).slice(0, 3)].map(x => ({ h: `<span class="jp">${esc(x.read)}</span>`, ok: x === it })), explain: `${esc(it.c)} = ${esc(it.read)} (${esc(it.de)})` });
+  const odd = () => { const three = shuffle(mem).slice(0, 3); const d = f.decoys[rnd(f.decoys.length)]; const dm = KWM[d];
+    return choiceQ({ err: 'kanji', title: 'Außenseiter', prompt: `Welches Zeichen enthält den Baustein <b class="jp">${esc(f.r)}</b> (${esc(f.name)}) <b>nicht</b>?`, grid: true, bigOpt: true,
+      options: [...three.map(x => ({ h: kwJ(x.c), ok: false })), { h: kwJ(d), ok: true }], explain: `${esc(d)} (${esc(dm ? dm.de : '')}) gehört zu einer anderen Familie.` }); };
+  const comp = () => { const three = shuffle(mem).slice(0, 3); const names = shuffle(KW_FAMS.filter(x => x.id !== f.id)).slice(0, 3).map(x => x.name);
+    return choiceQ({ err: 'kanji', title: 'Baustein erkennen', prompt: `<div class="rv-pic small">${f.pic}</div><div class="muted center">Dieser Baustein steckt in <span class="jp big">${three.map(x => esc(x.c)).join(' ')}</span>. Was bedeutet er?</div>`,
+      options: [f.name, ...names].map((h, i) => ({ h: esc(h), ok: i === 0 })), explain: `<span class="jp big">${esc(f.r)}</span> = ${esc(f.name)}` }); };
+  const multi = () => { const right = shuffle(mem).slice(0, 3); const dec = shuffle(f.decoys).slice(0, 3);
+    return multiQ({ err: 'kanji', title: 'Baustein finden', prompt: `Wähle 3 Zeichen aus, die „${esc(f.name.split(',')[0])}“ (<span class="jp">${esc(f.r)}</span>) enthalten.`, n: 3,
+      options: [...right.map(x => ({ h: kwJ(x.c), ok: true })), ...dec.map(c => ({ h: kwJ(c), ok: false }))], explain: right.map(x => `${esc(x.c)} ${esc(x.de)}`).join(' · ') }); };
+  add('Entdecken', '🔍', () => [revealQ({ title: 'Baustein entdecken', pic: `<span class="emo">${f.pic}</span>`, kanji: f.r,
+    text: `<div class="card center"><div class="giant jp">${esc(f.r)}</div><h3>${esc(f.name)}</h3>${f.alt ? `<p class="muted">Lange Form: <span class="jp">${esc(f.alt)}</span></p>` : ''}<p>${esc(f.story)}</p><p class="jp big">${mem.slice(0, 4).map(x => esc(x.c)).join(' ')}</p></div>` })]);
+  add('Baustein erkennen', '🧩', () => [comp(), comp()]);
+  add('Familie kennenlernen', '👪', () => [carouselQ({ title: 'Die Familie', cards: mem.map(x => ({ say: x.read, html: `<div class="card wcard"><div class="giant jp">${esc(x.c)}</div><div class="de">${esc(x.de)}</div><div class="roma">${esc(x.read)}</div><div class="muted">Baustein <span class="jp">${esc(f.r)}</span> = ${esc(f.name)}</div>${playBtn(x.read, 'lg')}</div>` })) })]);
+  add('Baustein finden', '🔎', () => [multi(), multi()]);
+  add('Kanji → Bedeutung', '🇩🇪', () => T(4).map(k2de));
+  add('Bedeutung → Kanji', '🔤', () => T(3).map(de2k));
+  add('Zuordnen', '🔗', () => [matchQ({ prompt: 'Ordne Kanji und Bedeutung zu.', pairs: shuffle(mem).slice(0, 5).map(x => ({ a: `<span class="jp big">${esc(x.c)}</span>`, b: esc(x.de), id: kwId(x.c) })) })]);
+  add('Lesungen', '🔊', () => T(3).map(rd));
+  add('Außenseiter', '🚫', () => [odd(), odd()]);
+  add('Schnellrunde', '⚡', () => T(6).map((it, i) => [k2de, de2k, rd][i % 3](it)).concat([multi()]));
+  add('Fehler wiederholen', '🎯', () => { const ids = uniq(ctx.missed).slice(0, 4); const its = ids.map(id => mem.find(x => kwId(x.c) === id)).filter(Boolean); return (its.length ? its : T(3)).map(k2de); });
+  slots.ctx = ctx; return slots;
+}

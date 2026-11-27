@@ -125,7 +125,7 @@ const KEY = 'jp-lern-app-v1';
 const defaults = () => ({
   v: 1, created: NOW(),
   settings: { mastery: 5, minAcc: 70, furigana: true, rate: 0.85, dailyGoal: 15, romajiHelp: true, padInput: true },
-  items: {}, lessons: {}, points: 0, streak: 0, best: 0, lastDay: '', days: {}, errors: {}, onboarded: false, placement: null,
+  items: {}, lessons: {}, points: 0, streak: 0, best: 0, lastDay: '', days: {}, errors: {}, onboarded: false, placement: null, kw: {},
 });
 let S = defaults();
 const Store = {
